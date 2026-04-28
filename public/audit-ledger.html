@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resource Audit Ledger — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .ledger-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:14px 20px;min-height:calc(100vh - 54px)}
+    .ledger-main{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .ledger-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .ledger-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;grid-column:1/-1}
+    .l-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;box-shadow:var(--shadow)}
+    .l-stat-val{font-size:1.2rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .l-stat-key{font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .chain-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .block{border-bottom:1px solid var(--border);padding:14px 16px;position:relative;animation:blk-in 0.4s ease}
+    @keyframes blk-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .block-num{font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;color:var(--accent)}
+    .block-time{font-size:0.68rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+    .block-hash{font-family:'JetBrains Mono',monospace;font-size:0.62rem;color:var(--text-muted);word-break:break-all;background:var(--bg-primary);padding:4px 8px;border-radius:4px;margin-bottom:6px}
+    .block-data{font-size:0.78rem;line-height:1.6}
+    .block-type{padding:2px 8px;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase}
+    .block-resource{display:flex;align-items:center;gap:6px;font-size:0.78rem;margin-top:4px}
+    .block-qty{font-family:'JetBrains Mono',monospace;font-weight:700}
+    .block-zone{font-weight:600}
+    .block-link{display:flex;align-items:center;gap:4px;font-size:0.6rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-top:6px}
+    .block-link-icon{color:var(--accent)}
+    .verify-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:0.62rem;font-weight:700}
+    .verify-valid{background:rgba(22,163,74,0.1);color:#16a34a}
+    .verify-invalid{background:rgba(220,38,38,0.1);color:#dc2626}
+    .integrity-bar{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow)}
+    .integrity-meter{height:8px;background:var(--bg-primary);border-radius:4px;overflow:hidden;margin:8px 0}
+    .integrity-fill{height:100%;border-radius:4px;transition:width 1s}
+    .integrity-label{display:flex;justify-content:space-between;font-size:0.72rem}
+    .btn-verify{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;padding:10px;font-size:0.85rem;font-weight:700;cursor:pointer;transition:all 0.2s;width:100%;font-family:'Inter',sans-serif}
+    .btn-verify:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(22,163,74,0.3)}
+    .btn-tamper{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:8px;padding:8px;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.2s;width:100%;font-family:'Inter',sans-serif}
+    .btn-tamper:hover{box-shadow:0 4px 12px rgba(220,38,38,0.3)}
+    .verify-result{padding:10px;border-radius:8px;font-size:0.78rem;font-weight:600;text-align:center;margin-top:8px}
+    .chain-viz{display:flex;align-items:center;gap:2px;padding:10px 14px;overflow-x:auto;flex-wrap:nowrap}
+    .chain-block{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;color:#fff;flex-shrink:0;transition:all 0.3s}
+    .chain-arrow{color:var(--text-muted);font-size:0.7rem;flex-shrink:0}
+    .export-section{padding:14px}
+    .btn-export-ledger{background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:0.78rem;cursor:pointer;width:100%;font-family:'Inter',sans-serif;color:var(--text-secondary);transition:all 0.2s}
+    .btn-export-ledger:hover{border-color:var(--accent);color:var(--accent)}
+    @media(max-width:800px){.ledger-layout{grid-template-columns:1fr}.ledger-stats{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(22,163,74,0.08)">🔗</div>
+        <div><div class="nav-page-title">Resource Audit Ledger</div><div class="nav-page-sub">Immutable Cryptographic Chain</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> SECURE</div><div class="nav-clock" id="clock">--:--</div><span class="badge badge-low" id="block-count">0 Blocks</span></div>
+  </nav>
+
+  <div class="ledger-layout">
+    <div class="ledger-main">
+      <div class="ledger-stats">
+        <div class="l-stat"><div class="l-stat-val" style="color:#16a34a" id="s-blocks">0</div><div class="l-stat-key">Blocks</div></div>
+        <div class="l-stat"><div class="l-stat-val" style="color:#2563eb" id="s-dispatches">0</div><div class="l-stat-key">Dispatches</div></div>
+        <div class="l-stat"><div class="l-stat-val" style="color:#7c3aed" id="s-resources">0</div><div class="l-stat-key">Total Units</div></div>
+        <div class="l-stat"><div class="l-stat-val" style="color:#16a34a" id="s-integrity">100%</div><div class="l-stat-key">Chain Integrity</div></div>
+      </div>
+
+      <div class="chain-card">
+        <div class="card-header">🔗 Chain Visualization</div>
+        <div class="chain-viz" id="chain-viz"></div>
+      </div>
+
+      <div class="chain-card">
+        <div class="card-header">📜 Immutable Block Ledger</div>
+        <div id="block-list" style="max-height:500px;overflow-y:auto"></div>
+      </div>
+    </div>
+
+    <div class="ledger-sidebar">
+      <div class="integrity-bar">
+        <div style="font-weight:700;font-size:0.85rem;margin-bottom:4px">🛡️ Chain Integrity</div>
+        <div class="integrity-meter"><div class="integrity-fill" id="integrity-fill" style="width:100%;background:#16a34a"></div></div>
+        <div class="integrity-label"><span>Tampered: <b id="tampered-count">0</b></span><span id="integrity-pct" style="color:#16a34a;font-weight:700">100% Valid</span></div>
+      </div>
+
+      <div class="chain-card">
+        <div class="card-header">🔍 Verify & Audit</div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+          <button class="btn-verify" id="btn-verify">✅ Verify Entire Chain</button>
+          <div id="verify-result" class="hidden"></div>
+          <hr style="border:none;border-top:1px solid var(--border)"/>
+          <div style="font-size:0.72rem;color:var(--text-muted);text-align:center">⚠️ Demo: Tamper with a block to test detection</div>
+          <button class="btn-tamper" id="btn-tamper">💀 Tamper Random Block</button>
+        </div>
+      </div>
+
+      <div class="chain-card">
+        <div class="card-header">📊 Resource Summary</div>
+        <div id="resource-summary" style="padding:14px"></div>
+      </div>
+
+      <div class="chain-card">
+        <div class="card-header">📤 Export</div>
+        <div class="export-section">
+          <button class="btn-export-ledger" id="btn-export">📄 Export Full Ledger (JSON)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    // SHA-256 hash function
+    async function sha256(message){
+      const msgBuffer=new TextEncoder().encode(message);
+      const hashBuffer=await crypto.subtle.digest('SHA-256',msgBuffer);
+      const hashArray=Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+
+    // Blockchain
+    const chain=[];
+    let tampered=new Set();
+
+    async function createBlock(data){
+      const prevHash=chain.length>0?chain[chain.length-1].hash:'0'.repeat(64);
+      const block={index:chain.length,timestamp:new Date().toISOString(),data,prevHash,nonce:Math.floor(Math.random()*99999)};
+      block.hash=await sha256(JSON.stringify({index:block.index,timestamp:block.timestamp,data:block.data,prevHash:block.prevHash,nonce:block.nonce}));
+      chain.push(block);
+      return block;
+    }
+
+    async function verifyChain(){
+      let valid=true;let invalidBlocks=[];
+      for(let i=0;i<chain.length;i++){
+        const block=chain[i];
+        const expectedHash=await sha256(JSON.stringify({index:block.index,timestamp:block.timestamp,data:block.data,prevHash:block.prevHash,nonce:block.nonce}));
+        if(block.hash!==expectedHash){valid=false;invalidBlocks.push(i);}
+        if(i>0&&block.prevHash!==chain[i-1].hash){valid=false;if(!invalidBlocks.includes(i))invalidBlocks.push(i);}
+      }
+      return{valid,invalidBlocks};
+    }
+
+    // Resource types
+    const RESOURCES=['🍱 Food Kits','💧 Water Units','🏥 Medical Kits','🚒 Rescue Teams','🚑 Ambulances'];
+    const ACTIONS=['DISPATCH','DELIVERY_CONFIRMED','INVENTORY_UPDATE','RESTOCK','TRANSFER'];
+    const ACTION_COLORS={DISPATCH:'#2563eb',DELIVERY_CONFIRMED:'#16a34a',INVENTORY_UPDATE:'#7c3aed',RESTOCK:'#0891b2',TRANSFER:'#ea580c'};
+
+    async function loadAndSeed(){
+      try{
+        const d=await(await fetch('/api/zones')).json();
+        const zones=d.zones;
+        // Seed initial blocks
+        const seedData=[
+          {action:'INVENTORY_UPDATE',resource:'🍱 Food Kits',qty:5000,zone:'Central Warehouse',agent:'SYSTEM'},
+          {action:'INVENTORY_UPDATE',resource:'💧 Water Units',qty:8000,zone:'Central Warehouse',agent:'SYSTEM'},
+          {action:'INVENTORY_UPDATE',resource:'🏥 Medical Kits',qty:1200,zone:'Central Warehouse',agent:'SYSTEM'},
+          {action:'DISPATCH',resource:'🍱 Food Kits',qty:350,zone:zones[0].name,agent:'Commander Alpha'},
+          {action:'DISPATCH',resource:'💧 Water Units',qty:600,zone:zones[0].name,agent:'Commander Alpha'},
+          {action:'DISPATCH',resource:'🏥 Medical Kits',qty:80,zone:zones[1].name,agent:'Dr. Meera Patel'},
+          {action:'DELIVERY_CONFIRMED',resource:'🍱 Food Kits',qty:350,zone:zones[0].name,agent:'Field Officer Bravo'},
+          {action:'DISPATCH',resource:'🚑 Ambulances',qty:3,zone:zones[3].name,agent:'Commander Delta'},
+          {action:'TRANSFER',resource:'💧 Water Units',qty:200,zone:zones[6].name+' → '+zones[5].name,agent:'Logistics AI'},
+          {action:'RESTOCK',resource:'🏥 Medical Kits',qty:500,zone:'Central Warehouse',agent:'Supply Chain'},
+          {action:'DISPATCH',resource:'🍱 Food Kits',qty:500,zone:zones[2].name,agent:'NGO Relief Team'},
+          {action:'DELIVERY_CONFIRMED',resource:'🏥 Medical Kits',qty:80,zone:zones[1].name,agent:'Field Officer Charlie'},
+        ];
+        for(const s of seedData){await createBlock(s);}
+        render();
+      }catch(e){console.error(e);}
+    }
+    loadAndSeed();
+
+    function render(){
+      document.getElementById('s-blocks').textContent=chain.length;
+      document.getElementById('block-count').textContent=chain.length+' Blocks';
+      document.getElementById('s-dispatches').textContent=chain.filter(b=>b.data.action==='DISPATCH').length;
+      document.getElementById('s-resources').textContent=chain.reduce((s,b)=>s+(b.data.qty||0),0);
+
+      // Chain viz
+      document.getElementById('chain-viz').innerHTML=chain.map((b,i)=>{
+        const color=tampered.has(i)?'#dc2626':(ACTION_COLORS[b.data.action]||'#6b7280');
+        return`<div class="chain-block" style="background:${color}" title="Block #${i}">${i}</div>${i<chain.length-1?'<span class="chain-arrow">→</span>':''}`;
+      }).join('');
+
+      // Block list
+      document.getElementById('block-list').innerHTML=chain.slice().reverse().map(b=>{
+        const color=ACTION_COLORS[b.data.action]||'#6b7280';
+        const isTampered=tampered.has(b.index);
+        return`<div class="block" style="${isTampered?'border-left:3px solid #dc2626':''}">
+          <div class="block-header"><span class="block-num">#${b.index}</span><span class="block-type" style="background:${color}15;color:${color}">${b.data.action}</span><span class="block-time">${new Date(b.timestamp).toLocaleTimeString('en-US',{hour12:false})}</span></div>
+          <div class="block-hash">SHA-256: ${b.hash}</div>
+          <div class="block-resource"><span class="block-qty" style="color:${color}">${b.data.qty}</span><span>${b.data.resource}</span><span>→</span><span class="block-zone">${b.data.zone}</span></div>
+          <div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px">Agent: ${b.data.agent}</div>
+          <div class="block-link"><span class="block-link-icon">🔗</span>prev: ${b.prevHash.substring(0,16)}...</div>
+          ${isTampered?'<span class="verify-badge verify-invalid">⚠️ TAMPERED</span>':'<span class="verify-badge verify-valid">✅ Valid</span>'}
+        </div>`;
+      }).join('');
+
+      // Resource summary
+      const summary={};
+      chain.forEach(b=>{
+        if(!summary[b.data.resource])summary[b.data.resource]={dispatched:0,confirmed:0,restocked:0};
+        if(b.data.action==='DISPATCH')summary[b.data.resource].dispatched+=b.data.qty;
+        if(b.data.action==='DELIVERY_CONFIRMED')summary[b.data.resource].confirmed+=b.data.qty;
+        if(b.data.action==='RESTOCK')summary[b.data.resource].restocked+=b.data.qty;
+      });
+      document.getElementById('resource-summary').innerHTML=Object.entries(summary).map(([k,v])=>
+        `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.78rem"><span>${k}</span><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem">↑${v.dispatched} ✅${v.confirmed} ♻️${v.restocked}</span></div>`
+      ).join('');
+
+      updateIntegrity();
+    }
+
+    function updateIntegrity(){
+      const pct=chain.length>0?Math.round((1-tampered.size/chain.length)*100):100;
+      document.getElementById('s-integrity').textContent=pct+'%';
+      document.getElementById('s-integrity').style.color=pct===100?'#16a34a':'#dc2626';
+      document.getElementById('integrity-fill').style.width=pct+'%';
+      document.getElementById('integrity-fill').style.background=pct===100?'#16a34a':'#dc2626';
+      document.getElementById('integrity-pct').textContent=pct+'% Valid';
+      document.getElementById('integrity-pct').style.color=pct===100?'#16a34a':'#dc2626';
+      document.getElementById('tampered-count').textContent=tampered.size;
+    }
+
+    // Verify
+    document.getElementById('btn-verify').addEventListener('click',async()=>{
+      const result=await verifyChain();
+      const div=document.getElementById('verify-result');
+      div.className='verify-result';
+      if(result.valid){div.style.background='rgba(22,163,74,0.08)';div.style.color='#16a34a';div.textContent='✅ Chain integrity verified — all '+chain.length+' blocks valid!';}
+      else{div.style.background='rgba(220,38,38,0.08)';div.style.color='#dc2626';div.textContent='⚠️ INTEGRITY BREACH — Blocks '+result.invalidBlocks.join(', ')+' have been tampered with!';}
+    });
+
+    // Tamper demo
+    document.getElementById('btn-tamper').addEventListener('click',()=>{
+      if(chain.length<3)return;
+      const idx=Math.floor(Math.random()*(chain.length-2))+1;
+      chain[idx].data.qty=chain[idx].data.qty+999;
+      tampered.add(idx);
+      render();
+    });
+
+    // Export
+    document.getElementById('btn-export').addEventListener('click',()=>{
+      const blob=new Blob([JSON.stringify(chain,null,2)],{type:'application/json'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download='crisisiq-ledger-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+    });
+  </script>
+</body>
+</html>

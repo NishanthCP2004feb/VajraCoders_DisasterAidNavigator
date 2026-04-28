@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Agricultural Assessment — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .agri-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 20px;max-width:1400px;margin:0 auto}
+    .agri-full{grid-column:1/-1}
+    .agri-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;grid-column:1/-1}
+    .a-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow)}
+    .a-stat-val{font-size:1.4rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .a-stat-key{font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .a-stat-sub{font-size:0.68rem;margin-top:4px;font-weight:600}
+    .agri-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .chart-body{padding:16px;min-height:260px;position:relative}
+    .chart-body canvas{max-height:280px}
+    .crop-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .crop-icon{font-size:1.3rem}
+    .crop-info{flex:1}
+    .crop-name{font-weight:700;font-size:0.82rem}
+    .crop-meta{font-size:0.68rem;color:var(--text-muted)}
+    .crop-loss-bar{width:100px;height:6px;background:var(--bg-primary);border-radius:3px;overflow:hidden}
+    .crop-loss-fill{height:100%;border-radius:3px}
+    .crop-loss{font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:700;width:45px;text-align:right}
+    .food-alert{background:linear-gradient(135deg,rgba(220,38,38,0.04),rgba(234,88,12,0.04));border:1px solid rgba(220,38,38,0.15);border-radius:10px;padding:14px;margin:10px 0}
+    .food-alert-title{font-weight:700;font-size:0.85rem;color:#dc2626;margin-bottom:6px}
+    .food-alert-text{font-size:0.78rem;color:var(--text-secondary);line-height:1.6}
+    .supply-chain{padding:14px}
+    .sc-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .sc-stage{font-weight:700;width:100px}
+    .sc-bar{flex:1;height:8px;background:var(--bg-primary);border-radius:4px;overflow:hidden}
+    .sc-fill{height:100%;border-radius:4px;transition:width 1s}
+    .sc-pct{font-family:'JetBrains Mono',monospace;width:40px;text-align:right;font-weight:700}
+    .sc-status{padding:2px 6px;border-radius:4px;font-size:0.6rem;font-weight:700;text-transform:uppercase}
+    .zone-agri{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
+    .zone-agri-name{font-weight:700;font-size:0.82rem;flex:1}
+    .zone-agri-impact{font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:700;width:50px;text-align:right}
+    .zone-agri-level{padding:2px 8px;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase}
+    .reco-item{padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .reco-title{font-weight:700;font-size:0.82rem;display:flex;align-items:center;gap:6px}
+    .reco-text{font-size:0.72rem;color:var(--text-secondary);margin-top:4px;line-height:1.5}
+    .reco-priority{padding:2px 6px;border-radius:4px;font-size:0.6rem;font-weight:700}
+    @media(max-width:900px){.agri-grid{grid-template-columns:1fr}.agri-stats{grid-template-columns:repeat(3,1fr)}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(22,163,74,0.08)">🌱</div>
+        <div><div class="nav-page-title">Agricultural Assessment</div><div class="nav-page-sub">Post-Disaster Food Security Analysis</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> ANALYSIS</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="agri-grid">
+    <div class="agri-stats">
+      <div class="a-stat"><div class="a-stat-val" style="color:#dc2626" id="s-loss">0%</div><div class="a-stat-key">Crop Loss</div><div class="a-stat-sub" style="color:#dc2626">Regional average</div></div>
+      <div class="a-stat"><div class="a-stat-val" style="color:#ea580c" id="s-hectares">0</div><div class="a-stat-key">Hectares Affected</div><div class="a-stat-sub" style="color:#ea580c">Farmland damaged</div></div>
+      <div class="a-stat"><div class="a-stat-val" style="color:#ca8a04" id="s-shortage">0</div><div class="a-stat-key">Months to Shortage</div><div class="a-stat-sub" style="color:#ca8a04">Projected timeline</div></div>
+      <div class="a-stat"><div class="a-stat-val" style="color:#2563eb" id="s-cost">₹0Cr</div><div class="a-stat-key">Economic Impact</div><div class="a-stat-sub" style="color:#2563eb">Agricultural losses</div></div>
+      <div class="a-stat"><div class="a-stat-val" style="color:#16a34a" id="s-secure">0%</div><div class="a-stat-key">Food Secure</div><div class="a-stat-sub" style="color:#16a34a">Zones with supply</div></div>
+    </div>
+
+    <div class="agri-card"><div class="card-header">🌾 Crop Damage Assessment</div><div id="crop-list"></div></div>
+
+    <div class="agri-card"><div class="card-header">📊 Crop Loss by Zone</div><div class="chart-body"><canvas id="chart-zone-loss"></canvas></div></div>
+
+    <div class="agri-card"><div class="card-header">📈 Food Security Timeline (6 Months)</div><div class="chart-body"><canvas id="chart-timeline"></canvas></div></div>
+
+    <div class="agri-card"><div class="card-header">🔗 Supply Chain Status</div><div class="supply-chain" id="supply-chain"></div></div>
+
+    <div class="agri-card agri-full">
+      <div class="card-header">🗺️ Zone-Wise Agricultural Impact</div>
+      <div id="zone-agri-list"></div>
+    </div>
+
+    <div class="agri-card">
+      <div class="card-header">🚨 Food Security Alerts</div>
+      <div style="padding:14px" id="food-alerts"></div>
+    </div>
+
+    <div class="agri-card">
+      <div class="card-header">📋 AI Recommendations</div>
+      <div id="reco-list"></div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    let zones=[];
+    const CROPS=[
+      {name:'Rice (Paddy)',icon:'🌾',area:1200,pricePerHectare:1.2,floodVulnerability:0.9,windVulnerability:0.3},
+      {name:'Groundnut',icon:'🥜',area:450,pricePerHectare:0.8,floodVulnerability:0.7,windVulnerability:0.2},
+      {name:'Sugarcane',icon:'🎋',area:600,pricePerHectare:1.5,floodVulnerability:0.5,windVulnerability:0.6},
+      {name:'Cotton',icon:'☁️',area:350,pricePerHectare:1.0,floodVulnerability:0.6,windVulnerability:0.7},
+      {name:'Maize',icon:'🌽',area:280,pricePerHectare:0.6,floodVulnerability:0.8,windVulnerability:0.4},
+      {name:'Vegetables',icon:'🥬',area:180,pricePerHectare:2.0,floodVulnerability:0.95,windVulnerability:0.5},
+      {name:'Pulses (Dal)',icon:'🫘',area:220,pricePerHectare:0.9,floodVulnerability:0.6,windVulnerability:0.3},
+      {name:'Coconut',icon:'🥥',area:400,pricePerHectare:0.7,floodVulnerability:0.3,windVulnerability:0.9}
+    ];
+
+    async function analyze(){
+      try{const d=await(await fetch('/api/zones')).json();zones=d.zones;}catch(e){return;}
+
+      // Fetch weather for severity estimation
+      let rainLevel=0,windLevel=0;
+      try{
+        const w=await(await fetch('https://api.open-meteo.com/v1/forecast?latitude=13.08&longitude=80.27&current=precipitation,windspeed_10m&timezone=auto')).json();
+        rainLevel=Math.min((w.current?.precipitation||0)/10,1);
+        windLevel=Math.min((w.current?.windspeed_10m||0)/60,1);
+      }catch(e){rainLevel=0.4;windLevel=0.3;}
+
+      // Disaster severity multiplier from zones
+      const avgSeverity=zones.reduce((s,z)=>s+z.severity,0)/zones.length;
+      const disasterMult=avgSeverity/10;
+
+      // Analyze crops
+      const analyzed=CROPS.map(c=>{
+        const floodDamage=c.floodVulnerability*rainLevel*disasterMult;
+        const windDamage=c.windVulnerability*windLevel*disasterMult;
+        const totalLoss=Math.min(95,Math.round((floodDamage+windDamage)*50+Math.random()*10));
+        const hectaresLost=Math.round(c.area*totalLoss/100);
+        const econLoss=parseFloat((hectaresLost*c.pricePerHectare).toFixed(1));
+        return{...c,loss:totalLoss,hectaresLost,econLoss};
+      });
+
+      // Stats
+      const avgLoss=Math.round(analyzed.reduce((s,c)=>s+c.loss,0)/analyzed.length);
+      const totalHectares=analyzed.reduce((s,c)=>s+c.hectaresLost,0);
+      const totalEcon=analyzed.reduce((s,c)=>s+c.econLoss,0);
+      const monthsToShortage=Math.max(1,Math.round(6-avgLoss/20));
+      const secureZones=Math.round((1-avgLoss/100)*zones.length/zones.length*100);
+
+      document.getElementById('s-loss').textContent=avgLoss+'%';
+      document.getElementById('s-hectares').textContent=totalHectares.toLocaleString();
+      document.getElementById('s-shortage').textContent=monthsToShortage;
+      document.getElementById('s-cost').textContent='₹'+Math.round(totalEcon)+'Cr';
+      document.getElementById('s-secure').textContent=secureZones+'%';
+
+      // Crop list
+      document.getElementById('crop-list').innerHTML=analyzed.sort((a,b)=>b.loss-a.loss).map(c=>{
+        const color=c.loss>70?'#dc2626':c.loss>40?'#ea580c':c.loss>20?'#ca8a04':'#16a34a';
+        return`<div class="crop-item"><div class="crop-icon">${c.icon}</div><div class="crop-info"><div class="crop-name">${c.name}</div><div class="crop-meta">${c.area} ha total · ₹${c.econLoss}Cr loss</div></div><div class="crop-loss-bar"><div class="crop-loss-fill" style="width:${c.loss}%;background:${color}"></div></div><div class="crop-loss" style="color:${color}">${c.loss}%</div></div>`;
+      }).join('');
+
+      // Zone loss chart
+      const zoneImpact=zones.map(z=>{const impact=Math.round(z.severity*8+Math.random()*15);return{name:z.name,impact:Math.min(95,impact)};});
+      new Chart(document.getElementById('chart-zone-loss'),{type:'bar',
+        data:{labels:zoneImpact.map(z=>z.name.split(' ').slice(0,2).join(' ')),
+          datasets:[{label:'Crop Loss %',data:zoneImpact.map(z=>z.impact),
+            backgroundColor:zoneImpact.map(z=>z.impact>70?'#dc262680':z.impact>40?'#ea580c80':'#16a34a80')}]},
+        options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{max:100}}}});
+
+      // Timeline chart
+      const months=['Month 1','Month 2','Month 3','Month 4','Month 5','Month 6'];
+      const supply=months.map((_,i)=>Math.max(10,100-avgLoss+i*((avgLoss/6)*0.8)+Math.random()*5));
+      const demand=months.map(()=>85+Math.random()*10);
+      new Chart(document.getElementById('chart-timeline'),{type:'line',
+        data:{labels:months,datasets:[
+          {label:'Food Supply %',data:supply,borderColor:'#16a34a',backgroundColor:'#16a34a20',fill:true,tension:0.4},
+          {label:'Food Demand %',data:demand,borderColor:'#dc2626',backgroundColor:'#dc262620',fill:true,tension:0.4,borderDash:[5,5]}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Inter',size:11}}}},scales:{y:{min:0,max:110,title:{display:true,text:'%'}}}}});
+
+      // Supply chain
+      const stages=[
+        {name:'Farm Production',pct:Math.max(5,100-avgLoss),status:avgLoss>50?'DISRUPTED':'ACTIVE'},
+        {name:'Warehousing',pct:Math.max(20,100-avgLoss*0.7),status:avgLoss>60?'CRITICAL':'OPERATIONAL'},
+        {name:'Transportation',pct:Math.max(30,100-zones.filter(z=>z.roadAccess==='blocked').length*15),status:'PARTIAL'},
+        {name:'Distribution',pct:Math.max(40,100-avgLoss*0.5),status:'ACTIVE'},
+        {name:'Retail/Ration',pct:Math.max(50,100-avgLoss*0.3),status:'OPERATIONAL'}
+      ];
+      document.getElementById('supply-chain').innerHTML=stages.map(s=>{
+        const color=s.pct<40?'#dc2626':s.pct<70?'#ea580c':'#16a34a';
+        return`<div class="sc-row"><span class="sc-stage">${s.name}</span><div class="sc-bar"><div class="sc-fill" style="width:${s.pct}%;background:${color}"></div></div><span class="sc-pct" style="color:${color}">${s.pct}%</span><span class="sc-status" style="background:${color}15;color:${color}">${s.status}</span></div>`;
+      }).join('');
+
+      // Zone agri impact
+      document.getElementById('zone-agri-list').innerHTML=zoneImpact.map(z=>{
+        const color=z.impact>70?'#dc2626':z.impact>40?'#ea580c':'#16a34a';
+        const level=z.impact>70?'SEVERE':z.impact>40?'MODERATE':'LOW';
+        return`<div class="zone-agri"><span class="zone-agri-name">${z.name}</span><span class="zone-agri-impact" style="color:${color}">${z.impact}%</span><span class="zone-agri-level" style="background:${color}15;color:${color}">${level}</span></div>`;
+      }).join('');
+
+      // Alerts
+      document.getElementById('food-alerts').innerHTML=[
+        avgLoss>50?{t:'CRITICAL: Severe Crop Loss Detected',m:`Average crop damage at ${avgLoss}%. Immediate food relief imports required within ${monthsToShortage} months to prevent famine.`}:null,
+        totalHectares>1000?{t:'Major Farmland Impact',m:`${totalHectares.toLocaleString()} hectares of agricultural land damaged. Soil restoration programs needed.`}:null,
+        {t:'Water Contamination Risk',m:'Flood-affected farmlands may have contaminated groundwater. Advise soil testing before replanting.'},
+        {t:'Seed Bank Advisory',m:'Distribute emergency seed kits to affected farmers within 2 weeks to catch the next planting season.'}
+      ].filter(Boolean).map(a=>`<div class="food-alert"><div class="food-alert-title">⚠️ ${a.t}</div><div class="food-alert-text">${a.m}</div></div>`).join('');
+
+      // Recommendations
+      document.getElementById('reco-list').innerHTML=[
+        {icon:'🚛',title:'Emergency Food Import',text:'Coordinate with state granaries to release buffer stock. Estimated need: '+Math.round(totalHectares*0.5)+' tonnes.',priority:'URGENT',color:'#dc2626'},
+        {icon:'🌱',title:'Emergency Seed Distribution',text:'Distribute flood-resistant rice and pulse seed varieties to '+zones.length+' affected zones.',priority:'HIGH',color:'#ea580c'},
+        {icon:'💧',title:'Irrigation Repair',text:'Restore damaged irrigation channels in '+zones.filter(z=>z.severity>=6).length+' severely affected zones.',priority:'HIGH',color:'#2563eb'},
+        {icon:'🧪',title:'Soil Quality Testing',text:'Deploy mobile soil testing units to assess contamination levels before replanting.',priority:'MEDIUM',color:'#ca8a04'},
+        {icon:'💰',title:'Farmer Compensation',text:'Estimated compensation package: ₹'+Math.round(totalEcon*0.4)+'Cr for crop insurance claims.',priority:'MEDIUM',color:'#7c3aed'}
+      ].map(r=>`<div class="reco-item"><div class="reco-title">${r.icon} ${r.title} <span class="reco-priority" style="background:${r.color}15;color:${r.color}">${r.priority}</span></div><div class="reco-text">${r.text}</div></div>`).join('');
+    }
+
+    analyze();
+  </script>
+</body>
+</html>

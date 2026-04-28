@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Voice Command — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .voice-layout{display:flex;flex-direction:column;gap:14px;padding:14px 20px;max-width:900px;margin:0 auto;min-height:calc(100vh - 54px)}
+    .voice-hero{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:40px 30px;text-align:center;box-shadow:var(--shadow);position:relative;overflow:hidden}
+    .voice-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(124,58,237,0.03),transparent 70%)}
+    .mic-btn{width:100px;height:100px;border-radius:50%;border:none;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;font-size:2.5rem;cursor:pointer;transition:all 0.3s;box-shadow:0 4px 20px rgba(124,58,237,0.3);margin:0 auto 16px;display:flex;align-items:center;justify-content:center}
+    .mic-btn:hover{transform:scale(1.05);box-shadow:0 8px 30px rgba(124,58,237,0.45)}
+    .mic-btn.listening{animation:mic-pulse 1.5s infinite;background:linear-gradient(135deg,#dc2626,#b91c1c);box-shadow:0 4px 30px rgba(220,38,38,0.5)}
+    @keyframes mic-pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(220,38,38,0.4)}50%{transform:scale(1.05);box-shadow:0 0 0 20px rgba(220,38,38,0)}}
+    .voice-status{font-size:0.85rem;color:var(--text-muted);margin-bottom:8px}
+    .voice-status.active{color:#dc2626;font-weight:700}
+    .voice-transcript{font-size:1.1rem;font-weight:600;color:var(--text-primary);min-height:30px;padding:10px;background:var(--bg-primary);border-radius:8px;margin:10px 0;font-family:'Inter',sans-serif}
+    .voice-response{background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:left;font-size:0.85rem;line-height:1.7;color:var(--text-secondary);min-height:60px;display:none}
+    .voice-response.visible{display:block;animation:fade-in 0.3s ease}
+    @keyframes fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .cmd-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+    .cmd-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:left;box-shadow:var(--shadow);cursor:pointer;transition:all 0.2s}
+    .cmd-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+    .cmd-icon{font-size:1.3rem;margin-bottom:4px}
+    .cmd-phrase{font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:2px}
+    .cmd-desc{font-size:0.65rem;color:var(--text-muted)}
+    .history-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .history-item{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem;animation:fade-in 0.3s ease}
+    .history-icon{font-size:1rem;flex-shrink:0;margin-top:2px}
+    .history-info{flex:1}
+    .history-cmd{font-weight:700;font-size:0.82rem;color:var(--accent)}
+    .history-result{font-size:0.72rem;color:var(--text-secondary);margin-top:2px;line-height:1.5}
+    .history-time{font-size:0.65rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;flex-shrink:0}
+    .waveform{display:flex;align-items:center;justify-content:center;gap:3px;height:40px;margin:10px 0;opacity:0;transition:opacity 0.3s}
+    .waveform.active{opacity:1}
+    .wave-bar{width:4px;background:#7c3aed;border-radius:2px;animation:wave 0.6s ease-in-out infinite}
+    .wave-bar:nth-child(1){animation-delay:0s;height:10px}
+    .wave-bar:nth-child(2){animation-delay:0.1s;height:20px}
+    .wave-bar:nth-child(3){animation-delay:0.2s;height:30px}
+    .wave-bar:nth-child(4){animation-delay:0.3s;height:20px}
+    .wave-bar:nth-child(5){animation-delay:0.4s;height:25px}
+    .wave-bar:nth-child(6){animation-delay:0.15s;height:15px}
+    .wave-bar:nth-child(7){animation-delay:0.35s;height:35px}
+    @keyframes wave{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}}
+    .no-support{background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);color:#dc2626;padding:14px;border-radius:10px;font-size:0.85rem;text-align:center;display:none}
+    @media(max-width:700px){.cmd-grid{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(124,58,237,0.08)">🎙️</div>
+        <div><div class="nav-page-title">Voice Command Center</div><div class="nav-page-sub">Web Speech API — Hands-Free Control</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> READY</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="voice-layout">
+    <div class="voice-hero">
+      <button class="mic-btn" id="mic-btn">🎤</button>
+      <div class="waveform" id="waveform"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
+      <div class="voice-status" id="voice-status">Click microphone or press Space to start</div>
+      <div class="voice-transcript" id="voice-transcript">Waiting for voice input...</div>
+      <div class="voice-response" id="voice-response"></div>
+      <div class="no-support" id="no-support">⚠️ Your browser does not support the Web Speech API. Please use Chrome or Edge.</div>
+    </div>
+
+    <div class="section-title">🗣️ Available Voice Commands</div>
+    <div class="cmd-grid" id="cmd-grid">
+      <div class="cmd-card" data-cmd="show critical zones"><div class="cmd-icon">🔴</div><div class="cmd-phrase">"Show critical zones"</div><div class="cmd-desc">List all severity ≥8 zones</div></div>
+      <div class="cmd-card" data-cmd="allocate resources"><div class="cmd-icon">⚡</div><div class="cmd-phrase">"Allocate resources"</div><div class="cmd-desc">Trigger resource allocation</div></div>
+      <div class="cmd-card" data-cmd="launch drone"><div class="cmd-icon">🚁</div><div class="cmd-phrase">"Launch drone"</div><div class="cmd-desc">Deploy drone to blocked zone</div></div>
+      <div class="cmd-card" data-cmd="broadcast emergency"><div class="cmd-icon">🚨</div><div class="cmd-phrase">"Broadcast emergency"</div><div class="cmd-desc">Send emergency alert</div></div>
+      <div class="cmd-card" data-cmd="status report"><div class="cmd-icon">📊</div><div class="cmd-phrase">"Status report"</div><div class="cmd-desc">Full system status summary</div></div>
+      <div class="cmd-card" data-cmd="weather update"><div class="cmd-icon">🌦️</div><div class="cmd-phrase">"Weather update"</div><div class="cmd-desc">Fetch live weather data</div></div>
+      <div class="cmd-card" data-cmd="show volunteers"><div class="cmd-icon">🤝</div><div class="cmd-phrase">"Show volunteers"</div><div class="cmd-desc">List registered volunteers</div></div>
+      <div class="cmd-card" data-cmd="earthquake report"><div class="cmd-icon">🌍</div><div class="cmd-phrase">"Earthquake report"</div><div class="cmd-desc">Recent seismic activity</div></div>
+      <div class="cmd-card" data-cmd="run forecast"><div class="cmd-icon">🧠</div><div class="cmd-phrase">"Run forecast"</div><div class="cmd-desc">AI predictive analysis</div></div>
+    </div>
+
+    <div class="history-card">
+      <div class="card-header">📜 Command History</div>
+      <div id="history-list"><div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.78rem">No commands yet</div></div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    let recognition;let isListening=false;let history=[];let zones=[];
+
+    async function loadZones(){try{const d=await(await fetch('/api/zones')).json();zones=d.zones;}catch(e){}}
+    loadZones();
+
+    if(!SpeechRecognition){document.getElementById('no-support').style.display='block';}
+    else{
+      recognition=new SpeechRecognition();
+      recognition.continuous=false;recognition.interimResults=true;recognition.lang='en-US';
+
+      recognition.onresult=e=>{
+        let transcript='';
+        for(let i=e.resultIndex;i<e.results.length;i++){transcript+=e.results[i][0].transcript;}
+        document.getElementById('voice-transcript').textContent=transcript;
+        if(e.results[e.results.length-1].isFinal){processCommand(transcript.toLowerCase().trim());}
+      };
+      recognition.onend=()=>{stopListening();};
+      recognition.onerror=e=>{document.getElementById('voice-status').textContent='Error: '+e.error;stopListening();};
+    }
+
+    function startListening(){
+      if(!recognition)return;
+      isListening=true;recognition.start();
+      document.getElementById('mic-btn').classList.add('listening');
+      document.getElementById('waveform').classList.add('active');
+      document.getElementById('voice-status').textContent='🔴 Listening...';
+      document.getElementById('voice-status').classList.add('active');
+    }
+
+    function stopListening(){
+      isListening=false;
+      try{recognition.stop();}catch(e){}
+      document.getElementById('mic-btn').classList.remove('listening');
+      document.getElementById('waveform').classList.remove('active');
+      document.getElementById('voice-status').textContent='Click microphone or press Space to start';
+      document.getElementById('voice-status').classList.remove('active');
+    }
+
+    document.getElementById('mic-btn').addEventListener('click',()=>{if(isListening)stopListening();else startListening();});
+    document.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.target.matches('input,textarea')){e.preventDefault();if(isListening)stopListening();else startListening();}});
+
+    // Click-to-execute command cards
+    document.getElementById('cmd-grid').addEventListener('click',e=>{
+      const card=e.target.closest('.cmd-card');
+      if(!card)return;
+      const cmd=card.dataset.cmd;
+      document.getElementById('voice-transcript').textContent=cmd;
+      processCommand(cmd);
+    });
+
+    async function processCommand(cmd){
+      let response='';let icon='🤖';
+
+      if(cmd.includes('critical')||cmd.includes('urgent')){
+        const critical=zones.filter(z=>z.severity>=8);
+        response=`🔴 <b>${critical.length} Critical Zones Found:</b><br>`+critical.map(z=>`• <b>${z.name}</b> — Severity ${z.severity}/10, Population ${z.population.toLocaleString()}`).join('<br>');
+        icon='🔴';
+      } else if(cmd.includes('allocate')||cmd.includes('resources')){
+        response='⚡ <b>Resource Allocation Triggered.</b><br>Generating optimal distribution plan across all '+zones.length+' zones based on priority scores. Check the <a href="/command-center.html">Command Center</a> for full allocation table.';
+        icon='⚡';
+      } else if(cmd.includes('drone')||cmd.includes('launch')){
+        const blocked=zones.filter(z=>z.roadAccess==='blocked');
+        response=`🚁 <b>Drone Dispatch Ready.</b><br>${blocked.length} blocked zones identified for aerial delivery:<br>`+blocked.map(z=>`• <b>${z.name}</b> — Road: ${z.roadAccess}`).join('<br>')+'<br>Visit <a href="/drone-dispatch.html">Drone Dispatch</a> to launch.';
+        icon='🚁';
+      } else if(cmd.includes('emergency')||cmd.includes('broadcast')){
+        response='🚨 <b>EMERGENCY BROADCAST initiated.</b><br>Alert sent to all zones. Tier: EMERGENCY. All field teams notified. Visit <a href="/alerts.html">Alert System</a> for details.';
+        icon='🚨';
+      } else if(cmd.includes('status')||cmd.includes('report')){
+        try{
+          const stats=await(await fetch('/api/stats')).json();
+          response=`📊 <b>System Status Report:</b><br>• Zones: ${stats.zones} | Critical: ${stats.criticalZones}<br>• Population: ${stats.population?.toLocaleString()}<br>• SOS Beacons: ${stats.activeBeacons}<br>• Volunteers: ${stats.volunteers}<br>• Active Alerts: ${stats.activeAlerts}<br>• Infrastructure Reports: ${stats.infraReports}<br>• Health Cases: ${stats.healthCases}`;
+        }catch(e){response='📊 Unable to fetch system stats.';}
+        icon='📊';
+      } else if(cmd.includes('weather')){
+        try{
+          const w=await(await fetch('https://api.open-meteo.com/v1/forecast?latitude=13.08&longitude=80.27&current=precipitation,windspeed_10m,weathercode&timezone=auto')).json();
+          const rain=w.current?.precipitation||0;const wind=w.current?.windspeed_10m||0;
+          response=`🌦️ <b>Live Weather (Chennai):</b><br>• Precipitation: ${rain} mm<br>• Wind Speed: ${wind} km/h<br>• Conditions: ${rain>5?'Heavy Rain':rain>0?'Light Rain':'Clear'}`;
+        }catch(e){response='🌦️ Weather API unavailable.';}
+        icon='🌦️';
+      } else if(cmd.includes('volunteer')){
+        try{
+          const v=await(await fetch('/api/volunteers')).json();
+          response=`🤝 <b>${v.total} Volunteers Registered.</b><br>`+(v.volunteers.slice(0,5).map(vol=>`• <b>${vol.name||vol.id}</b> — ${(vol.skills||[]).join(', ')||'General'}`).join('<br>')||'No volunteers yet.');
+        }catch(e){response='🤝 Volunteer data unavailable.';}
+        icon='🤝';
+      } else if(cmd.includes('earthquake')||cmd.includes('seismic')){
+        try{
+          const eq=await(await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson')).json();
+          response=`🌍 <b>${eq.features?.length||0} Earthquakes (24h, M2.5+):</b><br>`+(eq.features?.slice(0,4).map(f=>`• <b>M${f.properties.mag}</b> — ${f.properties.place}`).join('<br>')||'None detected.');
+        }catch(e){response='🌍 USGS data unavailable.';}
+        icon='🌍';
+      } else if(cmd.includes('forecast')||cmd.includes('predict')){
+        response='🧠 <b>AI Forecast Running...</b><br>Analyzing weather trends, zone vulnerabilities, and historical patterns. View full predictions at <a href="/forecasting.html">AI Forecasting</a>.';
+        icon='🧠';
+      } else {
+        response=`❓ Command not recognized: "<i>${cmd}</i>"<br>Try saying: "show critical zones", "status report", or "weather update".`;
+        icon='❓';
+      }
+
+      // Show response
+      const resDiv=document.getElementById('voice-response');
+      resDiv.innerHTML=response;resDiv.className='voice-response visible';
+
+      // Speak response (text-to-speech)
+      const cleanText=response.replace(/<[^>]*>/g,'').replace(/•/g,'').substring(0,200);
+      const utterance=new SpeechSynthesisUtterance(cleanText);
+      utterance.rate=1.1;utterance.pitch=1;
+      speechSynthesis.speak(utterance);
+
+      // Add to history
+      history.unshift({cmd,response,icon,time:new Date()});
+      renderHistory();
+    }
+
+    function renderHistory(){
+      const list=document.getElementById('history-list');
+      list.innerHTML=history.slice(0,10).map(h=>`<div class="history-item"><div class="history-icon">${h.icon}</div><div class="history-info"><div class="history-cmd">"${h.cmd}"</div><div class="history-result">${h.response}</div></div><div class="history-time">${h.time.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'})}</div></div>`).join('');
+    }
+  </script>
+</body>
+</html>
