@@ -16,6 +16,13 @@ The app ranks affected disaster zones, explains why each zone is prioritized, an
 - Dispatch mission cards with ETA, route distance, resources, and field objective
 - Scenario stress test comparing resource shock, current inventory, and supply surge
 - Downloadable JSON situation report for judges or responders
+- Icon-based command dashboard with separate pages for every advanced feature
+- Multi-agent command council with medical, logistics, equity, and risk agents
+- Six-hour disaster simulation for severity, medical pressure, roads, and shelter stress
+- Counterfactual lab showing what would change zone rankings
+- Citizen report intelligence endpoint for classifying field reports
+- Cascading risk graph for spillover and evacuation dependencies
+- Shelter evacuation decision engine
 - Live public data where available:
   - Open-Meteo weather API, no key required
   - USGS significant earthquake GeoJSON feed, no key required
@@ -50,6 +57,7 @@ GET  /api/health
 GET  /api/zones
 GET  /api/resources
 POST /api/plan
+POST /api/report
 ```
 
 Example plan request:
@@ -83,11 +91,33 @@ The allocation model distributes divisible resources by priority and then assign
 ## Hackathon Differentiators
 
 - Explainable scoring instead of a black-box rank
+- Separate routed pages for advanced features instead of one crowded dashboard
+- AI command council that combines multiple specialized decision agents
+- Forward simulation that projects how risk evolves over the next 6 hours
+- Counterfactual explanations that show what would change the decision
+- Citizen report analysis with credibility and urgency scoring
+- Cascading risk graph for non-obvious zone dependencies
+- Evacuation routing based on shelter overflow and accessible capacity
 - Fairness guardrail that checks whether vulnerable zones receive a proportional share of support
 - Stress-test mode to show how the plan changes during resource scarcity or supply surge
 - Mission-level outputs that convert analytics into field tasks
 - Works without paid APIs or secret keys
 - Render-ready and public GitHub-ready
+
+## Feature Pages
+
+```text
+/                               Command dashboard
+/features/operations             Map and allocation control
+/features/command-council        Multi-agent AI command council
+/features/simulation             Six-hour disaster simulation
+/features/counterfactuals        Counterfactual explanation lab
+/features/optimizer              Resource reallocation optimizer
+/features/citizen-reports        Citizen report intelligence
+/features/cascade-graph          Cascading risk graph
+/features/evacuation             Shelter evacuation engine
+/features/command-report         Downloadable command report
+```
 
 ## Deploy on Render
 

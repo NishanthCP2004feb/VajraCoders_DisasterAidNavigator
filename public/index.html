@@ -10,186 +10,30 @@
   </head>
   <body>
     <header class="app-header">
-      <div>
-        <p class="eyebrow">Emergency decision support</p>
-        <h1>DisasterAid Navigator</h1>
-      </div>
+      <a class="brand-link" href="/" data-route>
+        <span class="brand-mark"><i data-lucide="shield-alert"></i></span>
+        <span>
+          <small>Emergency command center</small>
+          <strong>DisasterAid Navigator</strong>
+        </span>
+      </a>
+      <nav class="top-nav" aria-label="Primary navigation">
+        <a href="/" data-route>Dashboard</a>
+        <a href="/features/operations" data-route>Operations</a>
+        <a href="/features/command-report" data-route>Report</a>
+      </nav>
       <div class="header-actions">
-        <span id="dataStatus" class="status-pill">Loading live signals</span>
+        <span id="dataStatus" class="status-pill">Loading intelligence</span>
         <button id="refreshBtn" class="icon-button" type="button" title="Refresh plan" aria-label="Refresh plan">
-          <span aria-hidden="true">Refresh</span>
+          <i data-lucide="refresh-cw"></i>
         </button>
       </div>
     </header>
 
-    <main class="app-shell">
-      <section class="control-band" aria-label="Resource controls">
-        <label>
-          <span>Food kits</span>
-          <input id="foodKits" type="number" min="0" step="50" value="4200">
-        </label>
-        <label>
-          <span>Water units</span>
-          <input id="waterUnits" type="number" min="0" step="50" value="6500">
-        </label>
-        <label>
-          <span>Medical kits</span>
-          <input id="medicalKits" type="number" min="0" step="25" value="1700">
-        </label>
-        <label>
-          <span>Rescue teams</span>
-          <input id="rescueTeams" type="number" min="0" step="1" value="14">
-        </label>
-        <label>
-          <span>Ambulances</span>
-          <input id="ambulances" type="number" min="0" step="1" value="6">
-        </label>
-        <button id="generateBtn" class="primary-button" type="button">Generate plan</button>
-      </section>
-
-      <section class="strategy-band" aria-label="Decision strategy">
-        <div>
-          <p class="eyebrow">Decision strategy</p>
-          <div class="segmented-control" role="group" aria-label="Decision strategy">
-            <button class="strategy-option active" type="button" data-strategy="balanced">Balanced</button>
-            <button class="strategy-option" type="button" data-strategy="equity">Equity</button>
-            <button class="strategy-option" type="button" data-strategy="speed">Speed</button>
-          </div>
-        </div>
-        <button id="downloadReportBtn" class="secondary-button" type="button">Download situation report</button>
-      </section>
-
-      <section class="metrics-grid" aria-label="Plan summary">
-        <article class="metric-tile">
-          <span>Affected people</span>
-          <strong id="affectedMetric">--</strong>
-        </article>
-        <article class="metric-tile">
-          <span>Critical zones</span>
-          <strong id="criticalMetric">--</strong>
-        </article>
-        <article class="metric-tile">
-          <span>Weather risk</span>
-          <strong id="weatherMetric">--</strong>
-        </article>
-        <article class="metric-tile">
-          <span>Live events</span>
-          <strong id="eventMetric">--</strong>
-        </article>
-        <article class="metric-tile">
-          <span>Fairness guardrail</span>
-          <strong id="fairnessMetric">--</strong>
-        </article>
-        <article class="metric-tile">
-          <span>Unmet hotspots</span>
-          <strong id="unmetMetric">--</strong>
-        </article>
-      </section>
-
-      <section class="workspace-grid">
-        <div class="map-panel">
-          <div id="map" class="map-canvas" role="img" aria-label="Disaster impact map"></div>
-          <div id="mapFallback" class="map-fallback" hidden>Map library unavailable. The ranked decision table is still active.</div>
-        </div>
-
-        <aside class="insight-panel" aria-label="Decision insights">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Current top priority</p>
-              <h2 id="topZoneName">--</h2>
-            </div>
-            <span id="topZoneLevel" class="risk-badge">--</span>
-          </div>
-          <div id="topZoneReasons" class="reason-list"></div>
-          <div class="allocation-strip">
-            <div><span>Food</span><strong id="topFood">--</strong></div>
-            <div><span>Water</span><strong id="topWater">--</strong></div>
-            <div><span>Medical</span><strong id="topMedical">--</strong></div>
-            <div><span>Teams</span><strong id="topTeams">--</strong></div>
-          </div>
-          <div class="score-breakdown" id="scoreBreakdown"></div>
-          <div class="signal-box">
-            <h3>Live signal layer</h3>
-            <p id="signalSummary">Waiting for data.</p>
-          </div>
-        </aside>
-      </section>
-
-      <section class="advanced-grid" aria-label="Advanced decision intelligence">
-        <article class="ops-panel">
-          <div class="panel-heading compact">
-            <div>
-              <p class="eyebrow">Equity check</p>
-              <h2>Fairness audit</h2>
-            </div>
-            <span id="fairnessStatus" class="mini-status">--</span>
-          </div>
-          <div id="fairnessAudit" class="stack-list"></div>
-        </article>
-
-        <article class="ops-panel">
-          <div class="panel-heading compact">
-            <div>
-              <p class="eyebrow">Unmet demand</p>
-              <h2>Bottleneck radar</h2>
-            </div>
-          </div>
-          <div id="bottleneckList" class="stack-list"></div>
-        </article>
-
-        <article class="ops-panel missions-panel">
-          <div class="panel-heading compact">
-            <div>
-              <p class="eyebrow">Field execution</p>
-              <h2>Dispatch missions</h2>
-            </div>
-          </div>
-          <div id="missionCards" class="mission-grid"></div>
-        </article>
-
-        <article class="ops-panel">
-          <div class="panel-heading compact">
-            <div>
-              <p class="eyebrow">Stress test</p>
-              <h2>Scenario lab</h2>
-            </div>
-          </div>
-          <div id="scenarioRows" class="scenario-list"></div>
-        </article>
-      </section>
-
-      <section class="table-section" aria-label="Ranked allocation plan">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Decision output</p>
-            <h2>Relief priority and allocation plan</h2>
-          </div>
-          <span id="generatedAt" class="timestamp">--</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Zone</th>
-                <th>Score</th>
-                <th>Risk</th>
-                <th>Food</th>
-                <th>Water</th>
-                <th>Medical</th>
-                <th>Teams</th>
-                <th>Amb.</th>
-                <th>Unmet risk</th>
-                <th>Decision reason</th>
-              </tr>
-            </thead>
-            <tbody id="planRows"></tbody>
-          </table>
-        </div>
-      </section>
-    </main>
+    <main id="pageRoot" class="app-shell" tabindex="-1"></main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/app.js"></script>
   </body>
 </html>

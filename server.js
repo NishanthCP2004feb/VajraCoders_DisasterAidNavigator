@@ -574,6 +574,477 @@ function buildScenarioComparison(zones, hub, resources, weather, strategyName) {
   });
 }
 
+const AGENT_PROFILES = [
+  {
+    id: "medical",
+    name: "Medical Agent",
+    icon: "heart-pulse",
+    focus: "Ambulances, medical kits, hospital distance, and triage pressure.",
+    weights: {
+      medicalUrgency: 0.36,
+      severity: 0.22,
+      vulnerability: 0.14,
+      shelterGap: 0.1,
+      reports: 0.08,
+      accessDifficulty: 0.06,
+      weather: 0.04
+    }
+  },
+  {
+    id: "logistics",
+    name: "Logistics Agent",
+    icon: "truck",
+    focus: "Road access, route distance, blocked roads, and dispatch feasibility.",
+    weights: {
+      severity: 0.2,
+      accessDifficulty: 0.28,
+      population: 0.12,
+      reports: 0.12,
+      weather: 0.1,
+      medicalUrgency: 0.08,
+      vulnerability: 0.06,
+      shelterGap: 0.04
+    }
+  },
+  {
+    id: "equity",
+    name: "Equity Agent",
+    icon: "scale",
+    focus: "Vulnerable groups, shelter gaps, and proportional support.",
+    weights: {
+      vulnerability: 0.34,
+      shelterGap: 0.2,
+      population: 0.14,
+      medicalUrgency: 0.12,
+      severity: 0.1,
+      accessDifficulty: 0.06,
+      reports: 0.02,
+      weather: 0.02
+    }
+  },
+  {
+    id: "risk",
+    name: "Risk Agent",
+    icon: "radar",
+    focus: "Severity, live weather, incident reports, and cascading danger.",
+    weights: {
+      severity: 0.3,
+      weather: 0.18,
+      reports: 0.16,
+      accessDifficulty: 0.12,
+      medicalUrgency: 0.1,
+      shelterGap: 0.08,
+      vulnerability: 0.04,
+      population: 0.02
+    }
+  }
+];
+
+function scoreByWeights(components, weights) {
+  return round(Object.entries(weights).reduce((total, [key, weight]) => total + (components[key] || 0) * weight, 0));
+}
+
+function buildCommandCouncil(rankedZones) {
+  const agentResults = AGENT_PROFILES.map((agent) => {
+    const ranking = rankedZones
+      .map((zone) => ({
+        zoneId: zone.id,
+        zoneName: zone.name,
+        level: zone.level,
+        score: scoreByWeights(zone.components, agent.weights),
+        evidence: zone.reasoning.slice(0, 3)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map((item, index) => ({
+        ...item,
+        rank: index + 1
+      }));
+
+    return {
+      ...agent,
+      topChoice: ranking[0]?.zoneName || "No zone",
+      ranking: ranking.slice(0, 5)
+    };
+  });
+
+  const consensus = rankedZones
+    .map((zone) => {
+      const ranks = agentResults.map((agent) => agent.ranking.find((item) => item.zoneId === zone.id)?.rank || rankedZones.length + 1);
+      const averageRank = ranks.reduce((sum, value) => sum + value, 0) / ranks.length;
+      const supportCount = agentResults.filter((agent) => agent.topChoice === zone.name).length;
+      return {
+        zoneId: zone.id,
+        zoneName: zone.name,
+        finalRank: zone.rank || 0,
+        averageAgentRank: round(averageRank, 2),
+        supportCount,
+        finalScore: zone.score
+      };
+    })
+    .sort((a, b) => a.averageAgentRank - b.averageAgentRank || b.finalScore - a.finalScore)
+    .slice(0, 6);
+
+  const topChoices = [...new Set(agentResults.map((agent) => agent.topChoice))];
+  const debate = [
+    `${agentResults[0].name} flags ${agentResults[0].topChoice} for immediate medical stabilization.`,
+    `${agentResults[1].name} checks whether blocked roads could delay the same dispatch.`,
+    `${agentResults[2].name} verifies vulnerable zones are not deprioritized by distance alone.`,
+    `${agentResults[3].name} watches for weather-amplified escalation in the next operating window.`
+  ];
+
+  return {
+    consensusLeader: consensus[0]?.zoneName || "No consensus",
+    agreementLevel: topChoices.length === 1 ? "Unanimous" : topChoices.length === 2 ? "Strong" : "Contested",
+    agents: agentResults,
+    consensus,
+    debate
+  };
+}
+
+function riskStatus(score) {
+  if (score >= 86) return "Emergency escalation";
+  if (score >= 74) return "Critical watch";
+  if (score >= 58) return "Operational pressure";
+  return "Stable monitoring";
+}
+
+function buildFutureSimulation(rankedZones, weather) {
+  const hours = [0, 2, 4, 6];
+  const weatherMultiplier = Number(weather.riskScore || 0) / 100;
+  const zoneTimelines = rankedZones.slice(0, 6).map((zone) => {
+    const timeline = hours.map((hour) => {
+      const delayFactor = hour / 2;
+      const severity = clamp(zone.severity + delayFactor * (weatherMultiplier * 4 + zone.unmetRiskScore * 0.025 + zone.blockedRoads * 0.35), 0, 100);
+      const roadAccess = clamp(zone.roadAccess - delayFactor * (zone.blockedRoads * 1.8 + weatherMultiplier * 5), 0, 100);
+      const medicalRisk = clamp(zone.components.medicalUrgency + delayFactor * (zone.unmet.medicalKits / Math.max(zone.medicalNeed, 1)) * 16, 0, 100);
+      const shelterStress = clamp(zone.components.shelterGap + delayFactor * 4 + weatherMultiplier * 8, 0, 100);
+      const projectedScore = round(severity * 0.38 + (100 - roadAccess) * 0.18 + medicalRisk * 0.22 + shelterStress * 0.12 + zone.components.vulnerability * 0.1);
+
+      return {
+        hour,
+        severity: round(severity),
+        roadAccess: round(roadAccess),
+        medicalRisk: round(medicalRisk),
+        shelterStress: round(shelterStress),
+        projectedScore,
+        status: riskStatus(projectedScore)
+      };
+    });
+
+    return {
+      zoneId: zone.id,
+      zoneName: zone.name,
+      currentLevel: zone.level,
+      timeline
+    };
+  });
+
+  return {
+    horizonHours: 6,
+    assumptions: [
+      "Risk increases faster when weather risk and unmet medical demand are high.",
+      "Road access degrades faster when blocked-road reports are high.",
+      "Shelter stress rises when vulnerable people exceed shelter capacity."
+    ],
+    systemRiskCurve: hours.map((hour) => {
+      const points = zoneTimelines.map((zone) => zone.timeline.find((item) => item.hour === hour)?.projectedScore || 0);
+      return {
+        hour,
+        averageRisk: round(points.reduce((sum, value) => sum + value, 0) / Math.max(points.length, 1))
+      };
+    }),
+    zones: zoneTimelines
+  };
+}
+
+function buildCounterfactuals(rankedZones) {
+  const leader = rankedZones[0];
+  const challengers = rankedZones.slice(1, 6);
+
+  return {
+    target: leader
+      ? {
+          zoneId: leader.id,
+          zoneName: leader.name,
+          score: leader.score,
+          explanation: `${leader.name} is first because ${leader.reasoning.join(", ")}.`
+        }
+      : null,
+    rankFlipLevers: challengers.map((zone) => {
+      const margin = Math.max(leader.score - zone.score, 0);
+      return {
+        zoneId: zone.id,
+        zoneName: zone.name,
+        currentRank: zone.rank,
+        margin: round(margin),
+        actions: [
+          `${zone.name} becomes a top contender if severity rises by about ${Math.ceil(margin / 0.27)} points.`,
+          `${zone.name} can overtake if road access drops below ${Math.max(zone.roadAccess - Math.ceil(margin / 0.14), 5)}%.`,
+          `${leader.name} can lose rank if it receives ${Math.max(120, leader.unmet.medicalKits)} medical kits and ${Math.max(250, leader.unmet.waterUnits)} water units first.`
+        ]
+      };
+    })
+  };
+}
+
+function cloneZones(zones) {
+  return JSON.parse(JSON.stringify(zones));
+}
+
+function applyTransfer(zoneMap, transfer) {
+  const from = zoneMap.get(transfer.fromZoneId);
+  const to = zoneMap.get(transfer.toZoneId);
+  if (!from || !to) return;
+  from.allocation[transfer.resource] -= transfer.amount;
+  to.allocation[transfer.resource] += transfer.amount;
+}
+
+function buildReallocationOptimizer(rankedZones) {
+  const beforeHighUnmet = rankedZones.filter((zone) => zone.unmetRiskLevel === "Critical" || zone.unmetRiskLevel === "High").length;
+  const optimizedZones = cloneZones(rankedZones);
+  const zoneMap = new Map(optimizedZones.map((zone) => [zone.id, zone]));
+  const transfers = [];
+  const resourceNeeds = {
+    medicalKits: "medicalNeed",
+    waterUnits: "waterNeed",
+    foodKits: "foodNeed"
+  };
+
+  for (const resource of Object.keys(resourceNeeds)) {
+    const needName = resourceNeeds[resource];
+    const receivers = [...optimizedZones].sort((a, b) => b.unmetRiskScore - a.unmetRiskScore);
+    const donors = [...optimizedZones].sort((a, b) => a.score - b.score);
+
+    for (const receiver of receivers) {
+      if (receiver.unmet[resource] <= 0 || transfers.length >= 8) continue;
+      const donor = donors.find((candidate) => {
+        if (candidate.id === receiver.id) return false;
+        const minimumKeep = Math.floor(candidate[needName] * 0.62);
+        return candidate.allocation[resource] > minimumKeep && candidate.unmetRiskScore < receiver.unmetRiskScore - 12;
+      });
+      if (!donor) continue;
+
+      const donorSurplus = donor.allocation[resource] - Math.floor(donor[needName] * 0.62);
+      const amount = Math.max(0, Math.min(donorSurplus, receiver.unmet[resource], resource === "medicalKits" ? 120 : 260));
+      if (!amount) continue;
+
+      const transfer = {
+        resource,
+        amount,
+        fromZoneId: donor.id,
+        fromZoneName: donor.name,
+        toZoneId: receiver.id,
+        toZoneName: receiver.name,
+        reason: `Reduces ${receiver.unmetRiskLevel.toLowerCase()} unmet risk while keeping ${donor.name} above minimum coverage.`
+      };
+      transfers.push(transfer);
+      applyTransfer(zoneMap, transfer);
+      addCoverageAndUnmetRisk(optimizedZones);
+    }
+  }
+
+  addCoverageAndUnmetRisk(optimizedZones);
+  const afterHighUnmet = optimizedZones.filter((zone) => zone.unmetRiskLevel === "Critical" || zone.unmetRiskLevel === "High").length;
+  const beforeCoverage = round(rankedZones.reduce((sum, zone) => sum + zone.coverageAverage, 0) / Math.max(rankedZones.length, 1));
+  const afterCoverage = round(optimizedZones.reduce((sum, zone) => sum + zone.coverageAverage, 0) / Math.max(optimizedZones.length, 1));
+
+  return {
+    objective: "Minimize high unmet-risk zones while preserving minimum coverage in donor zones.",
+    before: {
+      highUnmetZones: beforeHighUnmet,
+      averageCoverage: beforeCoverage
+    },
+    after: {
+      highUnmetZones: afterHighUnmet,
+      averageCoverage: afterCoverage
+    },
+    transfers,
+    summary:
+      transfers.length > 0
+        ? `Recommended ${transfers.length} controlled reallocations.`
+        : "No safe internal transfer found; request external supply surge for shortage resources."
+  };
+}
+
+function buildCascadeGraph(rankedZones) {
+  const nodes = rankedZones.map((zone) => {
+    const spareShelter = Math.max(zone.shelterCapacity - zone.vulnerablePeople, 0);
+    return {
+      id: zone.id,
+      name: zone.name,
+      level: zone.level,
+      score: zone.score,
+      role: spareShelter > 500 && zone.roadAccess >= 70 ? "shelter-hub" : zone.unmetRiskScore >= 60 ? "risk-source" : "support-zone",
+      x: zone.longitude,
+      y: zone.latitude
+    };
+  });
+
+  const edges = [];
+  for (const source of rankedZones) {
+    for (const target of rankedZones) {
+      if (source.id === target.id) continue;
+      const distance = haversineKm(source, target);
+      const targetSpare = target.shelterCapacity - target.vulnerablePeople;
+
+      if (distance <= 4.8 && source.score >= 65 && edges.length < 18) {
+        edges.push({
+          from: source.id,
+          to: target.id,
+          strength: round(clamp((5 - distance) * 18 + source.score * 0.25, 10, 100)),
+          type: "spillover",
+          reason: `${source.name} can increase demand pressure in nearby ${target.name}.`
+        });
+      } else if (source.components.shelterGap > 20 && targetSpare > 300 && target.roadAccess > 60 && edges.length < 18) {
+        edges.push({
+          from: source.id,
+          to: target.id,
+          strength: round(clamp(targetSpare / 25, 10, 100)),
+          type: "evacuation-link",
+          reason: `${target.name} can absorb evacuees from ${source.name}.`
+        });
+      }
+    }
+  }
+
+  return {
+    nodes,
+    edges,
+    insight:
+      edges.length > 0
+        ? "The graph highlights zones where failure can spill into nearby demand or evacuation routes."
+        : "No critical cascade edges detected under current sample data."
+  };
+}
+
+function buildEvacuationPlan(rankedZones) {
+  const sources = rankedZones
+    .filter((zone) => zone.components.shelterGap > 0 || zone.level === "Critical")
+    .map((zone) => ({
+      ...zone,
+      overflow: Math.max(zone.vulnerablePeople - zone.shelterCapacity, Math.ceil(zone.vulnerablePeople * (zone.level === "Critical" ? 0.18 : 0.08)))
+    }))
+    .filter((zone) => zone.overflow > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const shelters = rankedZones
+    .map((zone) => ({
+      zoneId: zone.id,
+      zoneName: zone.name,
+      roadAccess: zone.roadAccess,
+      capacity: zone.shelterCapacity,
+      occupied: Math.min(zone.vulnerablePeople, zone.shelterCapacity),
+      spare: Math.max(zone.shelterCapacity - Math.min(zone.vulnerablePeople, zone.shelterCapacity), 0)
+    }))
+    .filter((shelter) => shelter.spare > 100 && shelter.roadAccess >= 55)
+    .sort((a, b) => b.roadAccess + b.spare / 50 - (a.roadAccess + a.spare / 50));
+
+  const movements = [];
+  let unassigned = 0;
+
+  for (const source of sources) {
+    let remaining = source.overflow;
+    for (const shelter of shelters) {
+      if (remaining <= 0) break;
+      if (shelter.zoneId === source.id || shelter.spare <= 0) continue;
+      const amount = Math.min(remaining, shelter.spare, 900);
+      shelter.spare -= amount;
+      shelter.occupied += amount;
+      remaining -= amount;
+      movements.push({
+        fromZoneId: source.id,
+        fromZoneName: source.name,
+        toZoneId: shelter.zoneId,
+        toZoneName: shelter.zoneName,
+        people: amount,
+        routeKm: round(haversineKm(source, rankedZones.find((zone) => zone.id === shelter.zoneId) || source), 2),
+        priority: source.level,
+        reason: `${source.name} has shelter stress; ${shelter.zoneName} has accessible spare capacity.`
+      });
+    }
+    unassigned += remaining;
+  }
+
+  return {
+    totalEvacuees: movements.reduce((sum, move) => sum + move.people, 0),
+    unassignedOverflow: unassigned,
+    movements,
+    shelters: shelters.map((shelter) => ({
+      ...shelter,
+      utilization: coveragePercent(shelter.occupied, shelter.capacity)
+    }))
+  };
+}
+
+function analyzeCitizenReport(text, zoneId, zones) {
+  const content = String(text || "").trim();
+  const lower = content.toLowerCase();
+  const matchedZone =
+    zones.find((zone) => zone.id === zoneId) ||
+    zones.find((zone) => lower.includes(zone.name.toLowerCase())) ||
+    zones.find((zone) => lower.includes(zone.district.toLowerCase()));
+
+  const classifiers = [
+    { type: "Rescue", keywords: ["trapped", "stranded", "collapse", "evacuate", "rescue"], urgency: 88 },
+    { type: "Medical", keywords: ["injured", "medicine", "doctor", "ambulance", "bleeding", "sick"], urgency: 82 },
+    { type: "Road Block", keywords: ["road", "bridge", "blocked", "traffic", "landslide"], urgency: 72 },
+    { type: "Water/Food", keywords: ["water", "food", "hungry", "ration", "milk"], urgency: 64 },
+    { type: "Shelter", keywords: ["shelter", "camp", "homeless", "school", "relocation"], urgency: 68 },
+    { type: "Flood", keywords: ["flood", "rain", "water level", "overflow", "drain"], urgency: 78 }
+  ];
+
+  const matches = classifiers
+    .map((item) => ({
+      ...item,
+      hits: item.keywords.filter((keyword) => lower.includes(keyword)).length
+    }))
+    .filter((item) => item.hits > 0)
+    .sort((a, b) => b.hits - a.hits || b.urgency - a.urgency);
+
+  const primary = matches[0] || { type: "General", urgency: 45, hits: 0, keywords: [] };
+  const hasNumber = /\d+/.test(content);
+  const credibility = clamp(
+    35 +
+      (matchedZone ? 22 : 0) +
+      (hasNumber ? 14 : 0) +
+      Math.min(content.length / 8, 18) +
+      Math.min(primary.hits * 8, 20),
+    0,
+    98
+  );
+  const priorityImpact = clamp(primary.urgency * 0.58 + credibility * 0.32 + (matchedZone?.severity || 50) * 0.1, 0, 100);
+
+  return {
+    receivedAt: new Date().toISOString(),
+    originalText: content,
+    classification: primary.type,
+    secondarySignals: matches.slice(1, 4).map((item) => item.type),
+    credibility: round(credibility),
+    urgencyScore: round(primary.urgency),
+    priorityImpact: round(priorityImpact),
+    zoneMatch: matchedZone
+      ? {
+          id: matchedZone.id,
+          name: matchedZone.name,
+          district: matchedZone.district
+        }
+      : null,
+    recommendedAction:
+      priorityImpact >= 80
+        ? "Escalate to command council and request field verification immediately."
+        : priorityImpact >= 62
+          ? "Add to incident queue and ask nearest mission team for confirmation."
+          : "Monitor and request more precise location or evidence.",
+    suggestedDataUpdate: matchedZone
+      ? {
+          incidentReportsDelta: Math.ceil(priorityImpact / 18),
+          severityDelta: primary.type === "Rescue" || primary.type === "Flood" ? 4 : 2,
+          roadAccessDelta: primary.type === "Road Block" ? -8 : 0
+        }
+      : null
+  };
+}
+
 function buildPlan(zones, hub, resources, weather, earthquake, strategyName = "balanced") {
   const strategy = getStrategy(strategyName);
   const rankedZones = scoreZones(zones, hub, weather, strategyName).sort((a, b) => b.score - a.score);
@@ -612,6 +1083,11 @@ function buildPlan(zones, hub, resources, weather, earthquake, strategyName = "b
     }
   );
 
+  const rankedWithRank = rankedZones.map((zone, index) => ({
+    ...zone,
+    rank: index + 1
+  }));
+
   return {
     generatedAt: new Date().toISOString(),
     strategy: {
@@ -626,14 +1102,17 @@ function buildPlan(zones, hub, resources, weather, earthquake, strategyName = "b
     weather,
     earthquake,
     totals,
-    fairnessAudit: buildFairnessAudit(rankedZones, totals),
-    bottlenecks: buildBottlenecks(rankedZones),
-    missions: buildMissions(rankedZones),
+    fairnessAudit: buildFairnessAudit(rankedWithRank, totals),
+    bottlenecks: buildBottlenecks(rankedWithRank),
+    missions: buildMissions(rankedWithRank),
     scenarios: buildScenarioComparison(zones, hub, resources, weather, strategyName),
-    zones: rankedZones.map((zone, index) => ({
-      ...zone,
-      rank: index + 1
-    }))
+    commandCouncil: buildCommandCouncil(rankedWithRank),
+    simulation: buildFutureSimulation(rankedWithRank, weather),
+    counterfactuals: buildCounterfactuals(rankedWithRank),
+    optimizer: buildReallocationOptimizer(rankedWithRank),
+    cascadeGraph: buildCascadeGraph(rankedWithRank),
+    evacuationPlan: buildEvacuationPlan(rankedWithRank),
+    zones: rankedWithRank
   };
 }
 
@@ -676,6 +1155,16 @@ async function handleApi(request, response, url) {
 
   if (url.pathname === "/api/resources") {
     sendJson(response, 200, resourceData);
+    return;
+  }
+
+  if (url.pathname === "/api/report") {
+    if (request.method !== "POST") {
+      sendError(response, 405, "Report analysis requires POST.");
+      return;
+    }
+    const body = await parseBody(request);
+    sendJson(response, 200, analyzeCitizenReport(body.text, body.zoneId, zones));
     return;
   }
 
