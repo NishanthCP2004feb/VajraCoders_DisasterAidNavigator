@@ -1,0 +1,22 @@
+{
+  "name": "disasteraid-navigator",
+  "version": "1.0.0",
+  "description": "An intelligent decision-support dashboard for disaster relief prioritization and resource allocation.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "disaster-response",
+    "decision-support",
+    "resource-allocation",
+    "hackathon",
+    "render"
+  ],
+  "author": "",
+  "license": "MIT"
+}

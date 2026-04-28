@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: disasteraid-navigator
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true

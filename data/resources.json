@@ -1,0 +1,14 @@
+{
+  "reliefHub": {
+    "name": "Central Relief Hub",
+    "latitude": 19.082,
+    "longitude": 72.878
+  },
+  "resources": {
+    "foodKits": 4200,
+    "waterUnits": 6500,
+    "medicalKits": 1700,
+    "rescueTeams": 14,
+    "ambulances": 6
+  }
+}
