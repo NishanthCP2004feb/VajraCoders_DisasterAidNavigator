@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Infrastructure Assessment — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .infra-layout{display:grid;grid-template-columns:1fr 380px;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
+    .infra-map-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+    #infra-map{flex:1;min-height:300px}
+    .infra-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .infra-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .infra-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;box-shadow:var(--shadow)}
+    .infra-stat-val{font-size:1.2rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .infra-stat-key{font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .form-group{display:flex;flex-direction:column;gap:4px}
+    .form-label{font-size:0.75rem;font-weight:600;color:var(--text-secondary)}
+    .form-input,.form-select{border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:0.85rem;font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);outline:none;transition:border-color 0.2s}
+    .form-input:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .damage-options{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+    .damage-opt{text-align:center;padding:10px 4px;border:2px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s}
+    .damage-opt:hover{border-color:var(--border-bright)}
+    .damage-opt.selected{border-width:2px}
+    .damage-opt .dm-icon{font-size:1.2rem;display:block;margin-bottom:2px}
+    .dm-destroyed{color:#dc2626}.dm-destroyed.selected{border-color:#dc2626;background:rgba(220,38,38,0.05)}
+    .dm-major{color:#ea580c}.dm-major.selected{border-color:#ea580c;background:rgba(234,88,12,0.05)}
+    .dm-minor{color:#ca8a04}.dm-minor.selected{border-color:#ca8a04;background:rgba(202,138,4,0.05)}
+    .dm-intact{color:#16a34a}.dm-intact.selected{border-color:#16a34a;background:rgba(22,163,74,0.05)}
+    .btn-report{background:linear-gradient(135deg,#ea580c,#c2410c);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:700;cursor:pointer;transition:all 0.2s;width:100%}
+    .btn-report:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(234,88,12,0.3)}
+    .report-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem;animation:rpt-in 0.3s ease}
+    @keyframes rpt-in{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+    .report-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .report-info{flex:1}
+    .report-name{font-weight:600}
+    .report-meta{font-size:0.68rem;color:var(--text-muted)}
+    .report-damage{padding:2px 6px;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;flex-shrink:0}
+    .cost-card{background:linear-gradient(135deg,rgba(234,88,12,0.05),rgba(220,38,38,0.05));border:1px solid rgba(234,88,12,0.2);border-radius:10px;padding:14px;text-align:center}
+    .cost-val{font-size:1.6rem;font-weight:900;font-family:'JetBrains Mono',monospace;color:#ea580c}
+    .cost-label{font-size:0.7rem;color:var(--text-muted);margin-top:2px}
+    .cost-breakdown{display:flex;justify-content:space-around;margin-top:8px;font-size:0.7rem;color:var(--text-secondary)}
+    .success-msg{background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);color:#16a34a;padding:10px;border-radius:8px;font-size:0.82rem;font-weight:600;text-align:center}
+    @media(max-width:800px){.infra-layout{grid-template-columns:1fr;height:auto}.infra-stats{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(234,88,12,0.08)">🏗️</div>
+        <div><div class="nav-page-title">Infrastructure Assessment</div><div class="nav-page-sub">Damage Classification & Cost Estimation</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div><span class="badge badge-high" id="report-count">0 Reports</span></div>
+  </nav>
+
+  <div class="infra-layout">
+    <div class="infra-map-panel">
+      <div class="card-header">🗺️ Infrastructure Damage Heatmap</div>
+      <div id="infra-map"></div>
+    </div>
+    <div class="infra-sidebar">
+      <div class="infra-stats">
+        <div class="infra-stat"><div class="infra-stat-val" style="color:#dc2626" id="s-destroyed">0</div><div class="infra-stat-key">Destroyed</div></div>
+        <div class="infra-stat"><div class="infra-stat-val" style="color:#ea580c" id="s-major">0</div><div class="infra-stat-key">Major Damage</div></div>
+        <div class="infra-stat"><div class="infra-stat-val" style="color:#ca8a04" id="s-minor">0</div><div class="infra-stat-key">Minor Damage</div></div>
+        <div class="infra-stat"><div class="infra-stat-val" style="color:#16a34a" id="s-intact">0</div><div class="infra-stat-key">Intact</div></div>
+      </div>
+      <div class="cost-card">
+        <div class="cost-label">ESTIMATED RECONSTRUCTION COST</div>
+        <div class="cost-val" id="total-cost">₹0 Cr</div>
+        <div class="cost-breakdown"><span>🏠 Buildings: <b id="cost-build">₹0</b></span><span>🛤️ Roads: <b id="cost-road">₹0</b></span><span>🏥 Critical: <b id="cost-crit">₹0</b></span></div>
+      </div>
+      <div class="card">
+        <div class="card-header">📝 Report Damage</div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+          <div class="form-group"><label class="form-label">Structure Name</label><input class="form-input" id="i-name" placeholder="e.g., Main Hospital" required/></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Type</label><select class="form-select" id="i-type"><option>Building</option><option>Bridge</option><option>Road</option><option>Hospital</option><option>School</option><option>Power Station</option><option>Water Tower</option></select></div>
+            <div class="form-group"><label class="form-label">Zone</label><select class="form-select" id="i-zone"></select></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Damage Level</label>
+            <div class="damage-options" id="damage-options">
+              <div class="damage-opt dm-destroyed" data-d="destroyed"><span class="dm-icon">💥</span>Destroyed</div>
+              <div class="damage-opt dm-major selected" data-d="major"><span class="dm-icon">🔶</span>Major</div>
+              <div class="damage-opt dm-minor" data-d="minor"><span class="dm-icon">🔸</span>Minor</div>
+              <div class="damage-opt dm-intact" data-d="intact"><span class="dm-icon">✅</span>Intact</div>
+            </div>
+          </div>
+          <button class="btn-report" id="btn-report">📡 Submit Report</button>
+          <div id="infra-success" class="hidden"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Recent Reports</div>
+        <div id="report-list" style="max-height:250px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const map=L.map('infra-map',{center:[13.08,80.27],zoom:12});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(map);
+    const heatLayer=L.layerGroup().addTo(map);
+
+    const DMG_COLORS={destroyed:'#dc2626',major:'#ea580c',minor:'#ca8a04',intact:'#16a34a'};
+    const DMG_COST={destroyed:15,major:8,minor:2,intact:0}; // crores
+    const TYPE_ICONS={Building:'🏠',Bridge:'🌉',Road:'🛤️',Hospital:'🏥',School:'🏫','Power Station':'⚡','Water Tower':'💧'};
+    let selectedDamage='major';
+    let reports=[];
+    let zoneData=[];
+
+    // Damage selection
+    document.getElementById('damage-options').addEventListener('click',e=>{
+      const opt=e.target.closest('.damage-opt');
+      if(!opt)return;
+      document.querySelectorAll('.damage-opt').forEach(o=>o.classList.remove('selected'));
+      opt.classList.add('selected');
+      selectedDamage=opt.dataset.d;
+    });
+
+    async function loadZones(){
+      try{
+        const data=await(await fetch('/api/zones')).json();
+        zoneData=data.zones;
+        const sel=document.getElementById('i-zone');
+        zoneData.forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.name;sel.appendChild(o)});
+        zoneData.forEach(z=>{
+          const sev=z.severity>=8?'#dc2626':z.severity>=6?'#ea580c':z.severity>=4?'#ca8a04':'#16a34a';
+          L.circleMarker([z.latitude,z.longitude],{radius:8,fillColor:sev,color:sev,weight:2,fillOpacity:0.2}).addTo(map).bindPopup(`<b>${z.name}</b><br>Severity: ${z.severity}/10`);
+        });
+      }catch(e){}
+    }
+    loadZones();
+
+    document.getElementById('btn-report').addEventListener('click',()=>{
+      const name=document.getElementById('i-name').value.trim();
+      if(!name)return alert('Enter structure name');
+      const zoneId=document.getElementById('i-zone').value;
+      const zone=zoneData.find(z=>z.id===zoneId);
+      const report={
+        name,type:document.getElementById('i-type').value,
+        damage:selectedDamage,zoneId,zoneName:zone?.name||'Unknown',
+        lat:zone?zone.latitude+(Math.random()-0.5)*0.02:13.08,
+        lng:zone?zone.longitude+(Math.random()-0.5)*0.02:80.27,
+        cost:DMG_COST[selectedDamage],
+        id:'INF-'+String(reports.length+1).padStart(3,'0'),
+        time:new Date()
+      };
+      reports.unshift(report);
+      addMarker(report);
+      updateStats();
+      renderReports();
+      document.getElementById('i-name').value='';
+      const suc=document.getElementById('infra-success');
+      suc.className='success-msg';suc.textContent=`✅ ${report.id} reported — ${report.damage} damage`;
+      setTimeout(()=>suc.className='hidden',3000);
+    });
+
+    function addMarker(r){
+      const color=DMG_COLORS[r.damage];
+      const icon=TYPE_ICONS[r.type]||'🏠';
+      L.circleMarker([r.lat,r.lng],{radius:12,fillColor:color,color:color,weight:2,fillOpacity:0.4}).addTo(heatLayer)
+        .bindPopup(`<b style="color:${color}">${icon} ${r.name}</b><br>Damage: ${r.damage}<br>Cost: ₹${r.cost} Cr<br>Zone: ${r.zoneName}`);
+    }
+
+    function updateStats(){
+      const counts={destroyed:0,major:0,minor:0,intact:0};
+      let totalCost=0,buildCost=0,roadCost=0,critCost=0;
+      reports.forEach(r=>{
+        counts[r.damage]++;
+        totalCost+=r.cost;
+        if(r.type==='Road'||r.type==='Bridge')roadCost+=r.cost;
+        else if(r.type==='Hospital'||r.type==='Power Station')critCost+=r.cost;
+        else buildCost+=r.cost;
+      });
+      document.getElementById('s-destroyed').textContent=counts.destroyed;
+      document.getElementById('s-major').textContent=counts.major;
+      document.getElementById('s-minor').textContent=counts.minor;
+      document.getElementById('s-intact').textContent=counts.intact;
+      document.getElementById('total-cost').textContent='₹'+totalCost+' Cr';
+      document.getElementById('cost-build').textContent='₹'+buildCost+'Cr';
+      document.getElementById('cost-road').textContent='₹'+roadCost+'Cr';
+      document.getElementById('cost-crit').textContent='₹'+critCost+'Cr';
+      document.getElementById('report-count').textContent=reports.length+' Reports';
+    }
+
+    function renderReports(){
+      document.getElementById('report-list').innerHTML=reports.slice(0,20).map(r=>{
+        const color=DMG_COLORS[r.damage];
+        return`<div class="report-item"><div class="report-dot" style="background:${color}"></div><div class="report-info"><div class="report-name">${TYPE_ICONS[r.type]||'🏠'} ${r.name}</div><div class="report-meta">${r.zoneName} · ${r.time.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'})}</div></div><span class="report-damage" style="background:${color}15;color:${color}">${r.damage}</span></div>`;
+      }).join('');
+    }
+
+    // Demo reports
+    [{name:'City General Hospital',type:'Hospital',damage:'major',zIdx:0},{name:'NH-45 Overpass',type:'Bridge',damage:'destroyed',zIdx:3},
+     {name:'Market Square Mall',type:'Building',damage:'minor',zIdx:2},{name:'Port Substation',type:'Power Station',damage:'destroyed',zIdx:3},
+     {name:'Hillcrest School',type:'School',damage:'major',zIdx:1},{name:'Delta Water Tower',type:'Water Tower',damage:'major',zIdx:0},
+     {name:'Industrial Road B7',type:'Road',damage:'minor',zIdx:7},{name:'Community Center',type:'Building',damage:'intact',zIdx:4}
+    ].forEach((d,i)=>{
+      setTimeout(()=>{
+        if(!zoneData.length)return;
+        const z=zoneData[d.zIdx]||zoneData[0];
+        const r={...d,zoneId:z.id,zoneName:z.name,lat:z.latitude+(Math.random()-0.5)*0.015,lng:z.longitude+(Math.random()-0.5)*0.015,cost:DMG_COST[d.damage],id:'INF-D'+String(i+1).padStart(2,'0'),time:new Date()};
+        reports.push(r);addMarker(r);updateStats();renderReports();
+      },2000);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Health Tracker — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .health-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 20px;max-width:1400px;margin:0 auto}
+    .health-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;grid-column:1/-1}
+    .h-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow);position:relative;overflow:hidden}
+    .h-stat::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+    .h-stat-val{font-size:1.5rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .h-stat-key{font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .h-stat-change{font-size:0.68rem;margin-top:4px;font-weight:600}
+    .chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .chart-header{padding:12px 16px;border-bottom:1px solid var(--border);font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;background:var(--bg-primary);display:flex;align-items:center;gap:6px}
+    .chart-body{padding:16px;position:relative;min-height:260px}
+    .chart-body canvas{max-height:280px}
+    .full-width{grid-column:1/-1}
+    .case-form{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .case-form-body{padding:14px;display:flex;flex-direction:column;gap:10px}
+    .form-group{display:flex;flex-direction:column;gap:4px}
+    .form-label{font-size:0.75rem;font-weight:600;color:var(--text-secondary)}
+    .form-input,.form-select{border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:0.82rem;font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);outline:none;transition:border-color 0.2s}
+    .form-input:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .btn-case{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:8px;padding:10px;font-size:0.85rem;font-weight:700;cursor:pointer;transition:all 0.2s;width:100%}
+    .btn-case:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(124,58,237,0.3)}
+    .med-inventory{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .med-item{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .med-name{flex:1;font-weight:600}
+    .med-bar{width:100px;height:6px;background:var(--bg-primary);border-radius:3px;overflow:hidden}
+    .med-fill{height:100%;border-radius:3px;transition:width 1s}
+    .med-qty{font-family:'JetBrains Mono',monospace;font-size:0.72rem;width:50px;text-align:right}
+    .med-status{padding:2px 6px;border-radius:4px;font-size:0.6rem;font-weight:700;text-transform:uppercase}
+    .hospital-card{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .hosp-icon{font-size:1.3rem}
+    .hosp-info{flex:1}
+    .hosp-name{font-weight:600;font-size:0.82rem}
+    .hosp-meta{font-size:0.68rem;color:var(--text-muted)}
+    .hosp-beds{text-align:right}
+    .hosp-beds-val{font-weight:700;font-family:'JetBrains Mono',monospace}
+    .hosp-beds-label{font-size:0.6rem;color:var(--text-muted)}
+    .bed-bar{width:80px;height:5px;background:var(--bg-primary);border-radius:3px;overflow:hidden;margin-top:3px}
+    .bed-fill{height:100%;border-radius:3px}
+    .success-msg{background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);color:#16a34a;padding:8px;border-radius:8px;font-size:0.78rem;font-weight:600;text-align:center}
+    @media(max-width:900px){.health-grid{grid-template-columns:1fr}.health-stats{grid-template-columns:repeat(3,1fr)}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(124,58,237,0.08)">🧬</div>
+        <div><div class="nav-page-title">Epidemic & Health Tracker</div><div class="nav-page-sub">Disease Monitoring & Hospital Capacity</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="health-grid">
+    <div class="health-stats">
+      <div class="h-stat" style="--ac:#dc2626"><div class="h-stat-val" style="color:#dc2626" id="s-total">0</div><div class="h-stat-key">Total Cases</div><div class="h-stat-change" style="color:#dc2626">↑ Active Monitoring</div></div>
+      <div class="h-stat"><div class="h-stat-val" style="color:#2563eb" id="s-water">0</div><div class="h-stat-key">Waterborne</div><div class="h-stat-change" style="color:#ea580c">⚠️ Rising</div></div>
+      <div class="h-stat"><div class="h-stat-val" style="color:#7c3aed" id="s-respiratory">0</div><div class="h-stat-key">Respiratory</div><div class="h-stat-change" style="color:#ca8a04">— Stable</div></div>
+      <div class="h-stat"><div class="h-stat-val" style="color:#ea580c" id="s-wound">0</div><div class="h-stat-key">Wound/Trauma</div><div class="h-stat-change" style="color:#16a34a">↓ Decreasing</div></div>
+      <div class="h-stat"><div class="h-stat-val" style="color:#16a34a" id="s-treated">0</div><div class="h-stat-key">Treated</div><div class="h-stat-change" style="color:#16a34a">✅ Recovery</div></div>
+    </div>
+
+    <div class="chart-card"><div class="chart-header">📈 Epidemiological Curve (24h)</div><div class="chart-body"><canvas id="chart-epi"></canvas></div></div>
+    <div class="chart-card"><div class="chart-header">🦠 Disease Distribution by Zone</div><div class="chart-body"><canvas id="chart-zone"></canvas></div></div>
+    <div class="chart-card"><div class="chart-header">📊 Disease Type Breakdown</div><div class="chart-body"><canvas id="chart-types"></canvas></div></div>
+
+    <div class="case-form">
+      <div class="card-header">🩺 Report Health Case</div>
+      <div class="case-form-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Disease Type</label><select class="form-select" id="c-type"><option>Cholera</option><option>Dysentery</option><option>Typhoid</option><option>Respiratory Infection</option><option>Skin Infection</option><option>Wound Infection</option><option>Dengue</option><option>Dehydration</option></select></div>
+          <div class="form-group"><label class="form-label">Zone</label><select class="form-select" id="c-zone"></select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Cases Count</label><input class="form-input" id="c-count" type="number" min="1" value="1"/></div>
+          <div class="form-group"><label class="form-label">Severity</label><select class="form-select" id="c-sev"><option>Mild</option><option>Moderate</option><option>Severe</option><option>Critical</option></select></div>
+        </div>
+        <button class="btn-case" id="btn-case">🩺 Report Cases</button>
+        <div id="case-success" class="hidden"></div>
+      </div>
+    </div>
+
+    <div class="med-inventory">
+      <div class="card-header">💊 Medicine Inventory</div>
+      <div id="med-list"></div>
+    </div>
+
+    <div class="chart-card full-width">
+      <div class="card-header">🏥 Hospital Capacity Monitor</div>
+      <div id="hospital-list"></div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const DISEASE_CATEGORIES={Cholera:'waterborne',Dysentery:'waterborne',Typhoid:'waterborne',
+      'Respiratory Infection':'respiratory','Skin Infection':'wound','Wound Infection':'wound',
+      Dengue:'waterborne',Dehydration:'waterborne'};
+    let cases=[];let zoneData=[];
+
+    async function loadZones(){
+      try{const d=await(await fetch('/api/zones')).json();zoneData=d.zones;
+        const sel=document.getElementById('c-zone');
+        zoneData.forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.name;sel.appendChild(o)});
+      }catch(e){}
+    }
+    loadZones();
+
+    document.getElementById('btn-case').addEventListener('click',()=>{
+      const type=document.getElementById('c-type').value;
+      const zoneId=document.getElementById('c-zone').value;
+      const count=parseInt(document.getElementById('c-count').value)||1;
+      const severity=document.getElementById('c-sev').value;
+      const zone=zoneData.find(z=>z.id===zoneId);
+      const c={type,category:DISEASE_CATEGORIES[type]||'other',zoneId,zoneName:zone?.name||'Unknown',count,severity,time:new Date()};
+      cases.push(c);
+      updateAll();
+      const suc=document.getElementById('case-success');
+      suc.className='success-msg';suc.textContent=`✅ ${count} ${type} case(s) reported in ${c.zoneName}`;
+      setTimeout(()=>suc.className='hidden',3000);
+    });
+
+    // Demo data
+    const demoData=[
+      {type:'Cholera',zIdx:0,count:15,severity:'Severe'},{type:'Dysentery',zIdx:6,count:22,severity:'Moderate'},
+      {type:'Respiratory Infection',zIdx:1,count:8,severity:'Mild'},{type:'Wound Infection',zIdx:3,count:12,severity:'Severe'},
+      {type:'Dehydration',zIdx:5,count:30,severity:'Moderate'},{type:'Dengue',zIdx:0,count:5,severity:'Severe'},
+      {type:'Typhoid',zIdx:6,count:7,severity:'Moderate'},{type:'Skin Infection',zIdx:5,count:9,severity:'Mild'},
+      {type:'Cholera',zIdx:3,count:18,severity:'Critical'},{type:'Respiratory Infection',zIdx:2,count:4,severity:'Mild'},
+      {type:'Wound Infection',zIdx:1,count:6,severity:'Moderate'},{type:'Dehydration',zIdx:7,count:11,severity:'Mild'}
+    ];
+    setTimeout(()=>{
+      demoData.forEach(d=>{
+        const z=zoneData[d.zIdx]||zoneData[0];
+        if(z)cases.push({...d,category:DISEASE_CATEGORIES[d.type],zoneId:z.id,zoneName:z.name,time:new Date(Date.now()-Math.random()*86400000)});
+      });
+      updateAll();
+    },1500);
+
+    function updateAll(){
+      let total=0,water=0,resp=0,wound=0,treated=0;
+      cases.forEach(c=>{
+        total+=c.count;
+        if(c.category==='waterborne')water+=c.count;
+        if(c.category==='respiratory')resp+=c.count;
+        if(c.category==='wound')wound+=c.count;
+        if(c.severity==='Mild')treated+=Math.floor(c.count*0.8);
+      });
+      document.getElementById('s-total').textContent=total;
+      document.getElementById('s-water').textContent=water;
+      document.getElementById('s-respiratory').textContent=resp;
+      document.getElementById('s-wound').textContent=wound;
+      document.getElementById('s-treated').textContent=treated;
+      renderCharts();renderMedicine();renderHospitals();
+    }
+
+    let charts={};
+    function renderCharts(){
+      // Epi curve
+      const hours=Array.from({length:24},(_,i)=>String(i).padStart(2,'0')+':00');
+      const hourCounts=hours.map((_,h)=>cases.filter(c=>new Date(c.time).getHours()===h).reduce((s,c)=>s+c.count,0));
+      if(charts.epi)charts.epi.destroy();
+      charts.epi=new Chart(document.getElementById('chart-epi'),{type:'line',data:{labels:hours,datasets:[{label:'Cases',data:hourCounts,borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.1)',fill:true,tension:0.4,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true},x:{ticks:{font:{size:9},maxRotation:45}}}}});
+
+      // Zone distribution
+      const zoneNames=[...new Set(cases.map(c=>c.zoneName))];
+      const waterByZone=zoneNames.map(z=>cases.filter(c=>c.zoneName===z&&c.category==='waterborne').reduce((s,c)=>s+c.count,0));
+      const respByZone=zoneNames.map(z=>cases.filter(c=>c.zoneName===z&&c.category==='respiratory').reduce((s,c)=>s+c.count,0));
+      const woundByZone=zoneNames.map(z=>cases.filter(c=>c.zoneName===z&&c.category==='wound').reduce((s,c)=>s+c.count,0));
+      if(charts.zone)charts.zone.destroy();
+      charts.zone=new Chart(document.getElementById('chart-zone'),{type:'bar',data:{labels:zoneNames,datasets:[{label:'Waterborne',data:waterByZone,backgroundColor:'#2563eb'},{label:'Respiratory',data:respByZone,backgroundColor:'#7c3aed'},{label:'Wound/Trauma',data:woundByZone,backgroundColor:'#ea580c'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Inter',size:11}}}},scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true}}}});
+
+      // Type breakdown donut
+      const types=[...new Set(cases.map(c=>c.type))];
+      const typeCounts=types.map(t=>cases.filter(c=>c.type===t).reduce((s,c)=>s+c.count,0));
+      const colors=['#dc2626','#ea580c','#ca8a04','#16a34a','#2563eb','#7c3aed','#db2777','#0891b2'];
+      if(charts.types)charts.types.destroy();
+      charts.types=new Chart(document.getElementById('chart-types'),{type:'doughnut',data:{labels:types,datasets:[{data:typeCounts,backgroundColor:colors.slice(0,types.length),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{family:'Inter',size:11}}}}}});
+    }
+
+    function renderMedicine(){
+      const meds=[
+        {name:'ORS Packets',stock:450,max:1000,icon:'💊'},{name:'Antibiotics',stock:120,max:500,icon:'💉'},
+        {name:'Bandages',stock:800,max:1000,icon:'🩹'},{name:'IV Fluids',stock:60,max:200,icon:'🧪'},
+        {name:'Paracetamol',stock:300,max:500,icon:'💊'},{name:'Anti-Malarials',stock:25,max:100,icon:'🦟'},
+        {name:'Insulin',stock:15,max:50,icon:'💉'},{name:'Surgical Kits',stock:8,max:30,icon:'🔪'}
+      ];
+      document.getElementById('med-list').innerHTML=meds.map(m=>{
+        const pct=(m.stock/m.max*100).toFixed(0);
+        const color=pct<20?'#dc2626':pct<50?'#ea580c':'#16a34a';
+        const status=pct<20?'CRITICAL':pct<50?'LOW':'OK';
+        return`<div class="med-item">${m.icon} <span class="med-name">${m.name}</span><div class="med-bar"><div class="med-fill" style="width:${pct}%;background:${color}"></div></div><span class="med-qty" style="color:${color}">${m.stock}</span><span class="med-status" style="background:${color}15;color:${color}">${status}</span></div>`;
+      }).join('');
+    }
+
+    function renderHospitals(){
+      const hospitals=[
+        {name:'City General Hospital',zone:'Riverside Delta',beds:200,occupied:185,icon:'🏥'},
+        {name:'Hillcrest Medical Center',zone:'Hillcrest Valley',beds:120,occupied:98,icon:'🏥'},
+        {name:'Central Community Clinic',zone:'Market Square',beds:50,occupied:22,icon:'🏪'},
+        {name:'Emergency Field Hospital',zone:'Old Fisherman Port',beds:80,occupied:78,icon:'⛺'},
+        {name:'Midtown Refugee Clinic',zone:'Midtown Refugee Camp',beds:60,occupied:55,icon:'🏥'},
+        {name:'Northern Rural Dispensary',zone:'Northern Farmlands',beds:30,occupied:18,icon:'🏠'}
+      ];
+      document.getElementById('hospital-list').innerHTML=hospitals.map(h=>{
+        const avail=h.beds-h.occupied;const pct=(h.occupied/h.beds*100).toFixed(0);
+        const color=pct>90?'#dc2626':pct>70?'#ea580c':'#16a34a';
+        return`<div class="hospital-card"><div class="hosp-icon">${h.icon}</div><div class="hosp-info"><div class="hosp-name">${h.name}</div><div class="hosp-meta">📍 ${h.zone} · ${pct}% occupied</div></div><div class="hosp-beds"><div class="hosp-beds-val" style="color:${color}">${avail}</div><div class="hosp-beds-label">beds free</div><div class="bed-bar"><div class="bed-fill" style="width:${pct}%;background:${color}"></div></div></div></div>`;
+      }).join('');
+    }
+  </script>
+</body>
+</html>

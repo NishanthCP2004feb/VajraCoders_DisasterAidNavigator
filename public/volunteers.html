@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Volunteer Hub — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .vol-layout{display:grid;grid-template-columns:360px 1fr;gap:14px;padding:14px 20px;min-height:calc(100vh - 54px)}
+    .vol-form-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow-y:auto;box-shadow:var(--shadow)}
+    .vol-form{padding:16px;display:flex;flex-direction:column;gap:12px}
+    .form-group{display:flex;flex-direction:column;gap:4px}
+    .form-label{font-size:0.75rem;font-weight:600;color:var(--text-secondary)}
+    .form-input,.form-select{border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:0.85rem;font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);outline:none;transition:border-color 0.2s}
+    .form-input:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .skill-chips{display:flex;flex-wrap:wrap;gap:6px}
+    .skill-chip{padding:5px 12px;border:1px solid var(--border);border-radius:16px;font-size:0.75rem;cursor:pointer;transition:all 0.2s;color:var(--text-secondary)}
+    .skill-chip:hover{border-color:var(--accent)}
+    .skill-chip.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn-register{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:10px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;transition:all 0.2s;width:100%}
+    .btn-register:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(22,163,74,0.35)}
+    .vol-main{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .vol-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .vol-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow)}
+    .vol-stat-val{font-size:1.4rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .vol-stat-key{font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .vol-tabs{display:flex;gap:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:4px}
+    .vol-tab{flex:1;padding:8px;text-align:center;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;color:var(--text-secondary);transition:all 0.2s}
+    .vol-tab.active{background:var(--accent);color:#fff}
+    .vol-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow);display:flex;gap:14px;align-items:flex-start;animation:vol-in 0.3s ease}
+    @keyframes vol-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .vol-avatar{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0}
+    .vol-info{flex:1}
+    .vol-name{font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:8px}
+    .vol-org{font-size:0.72rem;color:var(--text-muted)}
+    .vol-skills{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+    .vol-skill-tag{padding:2px 7px;background:var(--bg-primary);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;color:var(--text-muted)}
+    .vol-meta{display:flex;gap:12px;margin-top:6px;font-size:0.72rem;color:var(--text-muted)}
+    .vol-status{padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;text-transform:uppercase}
+    .status-available{background:rgba(22,163,74,0.1);color:#16a34a}
+    .status-deployed{background:rgba(37,99,235,0.1);color:#2563eb}
+    .status-resting{background:rgba(202,138,4,0.1);color:#a16207}
+    .vol-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+    .vol-btn{padding:5px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;background:var(--bg-primary);color:var(--text-secondary);transition:all 0.2s;font-family:'Inter',sans-serif}
+    .vol-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .match-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow);display:flex;gap:14px;align-items:center}
+    .match-score{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:800;font-family:'JetBrains Mono',monospace;flex-shrink:0;border:3px solid}
+    .match-arrow{font-size:1.2rem;color:var(--text-muted);flex-shrink:0}
+    .match-zone{background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:8px 12px;flex:1}
+    .match-zone-name{font-weight:700;font-size:0.85rem}
+    .match-zone-reason{font-size:0.7rem;color:var(--text-muted)}
+    .leaderboard-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)}
+    .lb-rank{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;font-weight:800;flex-shrink:0}
+    .lb-rank-1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff}
+    .lb-rank-2{background:linear-gradient(135deg,#94a3b8,#64748b);color:#fff}
+    .lb-rank-3{background:linear-gradient(135deg,#b45309,#92400e);color:#fff}
+    .lb-name{flex:1;font-weight:600;font-size:0.82rem}
+    .lb-hours{font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--text-secondary)}
+    .lb-missions{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)}
+    .success-msg{background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);color:#16a34a;padding:10px 14px;border-radius:8px;font-size:0.82rem;font-weight:600;text-align:center;animation:vol-in 0.3s ease}
+    @media(max-width:800px){.vol-layout{grid-template-columns:1fr}.vol-stats{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(22,163,74,0.08)">🤝</div>
+        <div><div class="nav-page-title">Volunteer & NGO Hub</div><div class="nav-page-sub">Coordination & Skill Matching</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div><span class="badge badge-low" id="vol-count">0 Volunteers</span></div>
+  </nav>
+
+  <div class="vol-layout">
+    <div class="vol-form-panel">
+      <div class="card-header">📝 Register Volunteer / NGO</div>
+      <form class="vol-form" id="vol-form">
+        <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="v-name" placeholder="Your full name" required/></div>
+        <div class="form-group"><label class="form-label">Organization (optional)</label><input class="form-input" id="v-org" placeholder="NGO or team name"/></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="v-phone" placeholder="+91..." required/></div>
+          <div class="form-group"><label class="form-label">Availability</label><select class="form-select" id="v-avail"><option>Full-time</option><option>Part-time</option><option>Weekends only</option><option>On-call</option></select></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Skills (click to select)</label>
+          <div class="skill-chips" id="skill-chips">
+            <span class="skill-chip" data-s="medical">🏥 Medical</span>
+            <span class="skill-chip" data-s="rescue">🚒 Rescue</span>
+            <span class="skill-chip" data-s="logistics">📦 Logistics</span>
+            <span class="skill-chip" data-s="driving">🚛 Driving</span>
+            <span class="skill-chip" data-s="cooking">🍳 Cooking</span>
+            <span class="skill-chip" data-s="counseling">🧠 Counseling</span>
+            <span class="skill-chip" data-s="engineering">🔧 Engineering</span>
+            <span class="skill-chip" data-s="communication">📡 Communication</span>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Experience Level</label><select class="form-select" id="v-exp"><option>Beginner</option><option>Intermediate</option><option>Experienced</option><option>Expert / Certified</option></select></div>
+        <button type="submit" class="btn-register">🤝 REGISTER VOLUNTEER</button>
+        <div id="vol-success" class="hidden"></div>
+      </form>
+    </div>
+
+    <div class="vol-main">
+      <div class="vol-stats">
+        <div class="vol-stat"><div class="vol-stat-val" style="color:#16a34a" id="s-total">0</div><div class="vol-stat-key">Total Volunteers</div></div>
+        <div class="vol-stat"><div class="vol-stat-val" style="color:#2563eb" id="s-deployed">0</div><div class="vol-stat-key">Deployed</div></div>
+        <div class="vol-stat"><div class="vol-stat-val" style="color:#7c3aed" id="s-hours">0</div><div class="vol-stat-key">Total Hours</div></div>
+        <div class="vol-stat"><div class="vol-stat-val" style="color:#ea580c" id="s-missions">0</div><div class="vol-stat-key">Missions Done</div></div>
+      </div>
+      <div class="vol-tabs" id="vol-tabs">
+        <div class="vol-tab active" data-tab="roster">👥 Roster</div>
+        <div class="vol-tab" data-tab="matching">🎯 AI Matching</div>
+        <div class="vol-tab" data-tab="leaderboard">🏆 Leaderboard</div>
+      </div>
+      <div id="tab-content"></div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const AVATARS = ['👤','👩','👨','👩‍⚕️','👨‍🚒','👷','🧑‍🔧','👩‍💼','🧑‍🍳','👨‍✈️'];
+    const AVATAR_BG = ['#dbeafe','#fce7f3','#d1fae5','#fef3c7','#ede9fe','#fde68a','#cffafe','#e0e7ff'];
+    let selectedSkills = new Set();
+    let volList = [];
+    let activeTab = 'roster';
+
+    // Skill selection
+    document.getElementById('skill-chips').addEventListener('click', e => {
+      const chip = e.target.closest('.skill-chip');
+      if (!chip) return;
+      chip.classList.toggle('selected');
+      const s = chip.dataset.s;
+      if (chip.classList.contains('selected')) selectedSkills.add(s); else selectedSkills.delete(s);
+    });
+
+    // Tab switching
+    document.getElementById('vol-tabs').addEventListener('click', e => {
+      const tab = e.target.closest('.vol-tab');
+      if (!tab) return;
+      document.querySelectorAll('.vol-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeTab = tab.dataset.tab;
+      renderTab();
+    });
+
+    // Register
+    document.getElementById('vol-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const vol = {
+        name: document.getElementById('v-name').value,
+        organization: document.getElementById('v-org').value,
+        phone: document.getElementById('v-phone').value,
+        availability: document.getElementById('v-avail').value,
+        skills: [...selectedSkills],
+        experience: document.getElementById('v-exp').value,
+        avatar: AVATARS[Math.floor(Math.random()*AVATARS.length)],
+        avatarBg: AVATAR_BG[Math.floor(Math.random()*AVATAR_BG.length)],
+        status: 'available',
+        hoursServed: 0,
+        missionsCompleted: 0,
+        id: 'VOL-' + String(volList.length+1).padStart(3,'0'),
+        registeredAt: new Date().toISOString()
+      };
+      try { await fetch('/api/volunteers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(vol)}); } catch(e){}
+      volList.unshift(vol);
+      updateStats();
+      renderTab();
+      const suc = document.getElementById('vol-success');
+      suc.className = 'success-msg';
+      suc.textContent = `✅ ${vol.name} registered as ${vol.id}!`;
+      setTimeout(() => suc.className = 'hidden', 4000);
+      selectedSkills.clear();
+      document.querySelectorAll('.skill-chip').forEach(c => c.classList.remove('selected'));
+      e.target.reset();
+    });
+
+    function updateStats() {
+      document.getElementById('s-total').textContent = volList.length;
+      document.getElementById('s-deployed').textContent = volList.filter(v=>v.status==='deployed').length;
+      document.getElementById('s-hours').textContent = volList.reduce((s,v)=>s+v.hoursServed,0);
+      document.getElementById('s-missions').textContent = volList.reduce((s,v)=>s+v.missionsCompleted,0);
+      document.getElementById('vol-count').textContent = volList.length + ' Volunteers';
+    }
+
+    function renderTab() {
+      const content = document.getElementById('tab-content');
+      if (activeTab === 'roster') {
+        content.innerHTML = volList.map((v,i) => {
+          const statusClass = 'status-'+(v.status||'available');
+          return `<div class="vol-card">
+            <div class="vol-avatar" style="background:${v.avatarBg}">${v.avatar}</div>
+            <div class="vol-info">
+              <div class="vol-name">${v.name} <span class="vol-status ${statusClass}">${v.status||'available'}</span></div>
+              <div class="vol-org">${v.organization||'Independent'} · ${v.experience||'Beginner'}</div>
+              <div class="vol-skills">${(v.skills||[]).map(s=>`<span class="vol-skill-tag">${s}</span>`).join('')}</div>
+              <div class="vol-meta"><span>📞 ${v.phone||'—'}</span><span>⏱ ${v.hoursServed}h served</span><span>🎯 ${v.missionsCompleted} missions</span></div>
+            </div>
+            <div class="vol-actions">
+              <button class="vol-btn" onclick="deployVol(${i})">🚀 Deploy</button>
+              <button class="vol-btn" onclick="restVol(${i})">😴 Rest</button>
+            </div>
+          </div>`;
+        }).join('') || '<div style="text-align:center;padding:40px;color:var(--text-muted)">No volunteers registered yet</div>';
+      } else if (activeTab === 'matching') {
+        const available = volList.filter(v=>v.status==='available');
+        content.innerHTML = '<div class="section-title">🎯 AI Skill-Zone Matching</div>' + (available.length ? available.map(v => {
+          const score = Math.floor(Math.random()*30+70);
+          const scoreColor = score>=90?'#16a34a':score>=75?'#2563eb':'#ca8a04';
+          const zones = ['Riverside Delta','Hillcrest Valley','Old Fisherman Port','Midtown Refugee Camp','Northern Farmlands'];
+          const reasons = ['High medical need matches your skills','Rescue operations require your expertise','Logistics support critically needed','Communication infrastructure rebuilding','Food distribution coordination needed'];
+          const zi = Math.floor(Math.random()*zones.length);
+          return `<div class="match-card" style="margin-bottom:10px">
+            <div class="vol-avatar" style="background:${v.avatarBg}">${v.avatar}</div>
+            <div style="flex:1"><div style="font-weight:700;font-size:0.85rem">${v.name}</div><div style="font-size:0.7rem;color:var(--text-muted)">${(v.skills||[]).join(', ')}</div></div>
+            <div class="match-score" style="color:${scoreColor};border-color:${scoreColor}">${score}%</div>
+            <div class="match-arrow">→</div>
+            <div class="match-zone"><div class="match-zone-name">${zones[zi]}</div><div class="match-zone-reason">${reasons[zi]}</div></div>
+          </div>`;
+        }).join('') : '<div style="text-align:center;padding:40px;color:var(--text-muted)">No available volunteers to match</div>');
+      } else {
+        const sorted = [...volList].sort((a,b)=>b.hoursServed-a.hoursServed);
+        content.innerHTML = '<div class="card" style="overflow:hidden"><div class="card-header">🏆 Top Contributors</div>' +
+          sorted.map((v,i) => `<div class="leaderboard-row">
+            <div class="lb-rank ${i<3?'lb-rank-'+(i+1):''}" style="${i>=3?'background:var(--bg-primary);color:var(--text-muted)':''}">${i+1}</div>
+            <div class="vol-avatar" style="background:${v.avatarBg};width:32px;height:32px;font-size:1rem;border-radius:8px">${v.avatar}</div>
+            <div class="lb-name">${v.name}</div>
+            <div class="lb-hours">${v.hoursServed}h</div>
+            <div class="lb-missions">${v.missionsCompleted} missions</div>
+          </div>`).join('') + '</div>';
+      }
+    }
+
+    window.deployVol = function(i) { volList[i].status='deployed'; updateStats(); renderTab(); };
+    window.restVol = function(i) { volList[i].status='resting'; updateStats(); renderTab(); };
+
+    // Demo data
+    const demoVols = [
+      {name:'Dr. Meera Patel',organization:'Red Cross India',phone:'+91-9876543210',skills:['medical','counseling'],experience:'Expert / Certified',status:'deployed',hoursServed:48,missionsCompleted:12,avatar:'👩‍⚕️',avatarBg:'#dbeafe'},
+      {name:'Arjun Singh',organization:'Rapid Response Team',phone:'+91-9123456789',skills:['rescue','driving','engineering'],experience:'Experienced',status:'deployed',hoursServed:36,missionsCompleted:8,avatar:'👨‍🚒',avatarBg:'#fde68a'},
+      {name:'Kavitha Reddy',organization:'',phone:'+91-8765432109',skills:['cooking','logistics'],experience:'Intermediate',status:'available',hoursServed:22,missionsCompleted:5,avatar:'🧑‍🍳',avatarBg:'#d1fae5'},
+      {name:'Vikram Nair',organization:'Tech4Good NGO',phone:'+91-7654321098',skills:['communication','logistics'],experience:'Experienced',status:'available',hoursServed:30,missionsCompleted:7,avatar:'👨‍💼',avatarBg:'#ede9fe'},
+      {name:'Sunita Devi',organization:'Women Aid Foundation',phone:'+91-6543210987',skills:['medical','counseling'],experience:'Intermediate',status:'resting',hoursServed:15,missionsCompleted:3,avatar:'👩',avatarBg:'#fce7f3'}
+    ];
+    demoVols.forEach((v,i) => { v.id='VOL-D'+String(i+1).padStart(2,'0'); v.registeredAt=new Date().toISOString(); volList.push(v); });
+    updateStats(); renderTab();
+  </script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Satellite Imagery — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .sat-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
+    .sat-map-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+    #sat-map{flex:1;min-height:400px}
+    .sat-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .layer-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .layer-option{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:all 0.2s;font-size:0.82rem}
+    .layer-option:hover{background:var(--bg-primary)}
+    .layer-option.active{background:var(--accent-glow);border-left:3px solid var(--accent)}
+    .layer-option:last-child{border-bottom:none}
+    .layer-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .layer-option.active .layer-radio{border-color:var(--accent)}
+    .layer-option.active .layer-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--accent)}
+    .layer-info{flex:1}
+    .layer-name{font-weight:600;font-size:0.82rem}
+    .layer-desc{font-size:0.68rem;color:var(--text-muted)}
+    .event-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem;cursor:pointer;transition:background 0.2s}
+    .event-item:hover{background:var(--bg-primary)}
+    .event-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .event-info{flex:1}
+    .event-title{font-weight:600;font-size:0.78rem;color:var(--text-primary)}
+    .event-meta{font-size:0.68rem;color:var(--text-muted)}
+    .event-cat{padding:2px 6px;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;flex-shrink:0}
+    .opacity-slider{padding:10px 14px}
+    .opacity-slider input[type="range"]{width:100%;accent-color:var(--accent)}
+    .opacity-label{font-size:0.72rem;color:var(--text-muted);display:flex;justify-content:space-between;margin-bottom:4px}
+    .nasa-badge{display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(37,99,235,0.05);font-size:0.7rem;color:var(--accent);font-weight:600;border-top:1px solid var(--border)}
+    .date-control{padding:10px 14px;display:flex;gap:8px;align-items:center}
+    .date-control input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:0.78rem;background:var(--bg-primary);color:var(--text-primary);font-family:'Inter',sans-serif}
+    .coord-display{position:absolute;bottom:10px;left:10px;z-index:999;background:rgba(0,0,0,0.7);color:#fff;padding:4px 10px;border-radius:6px;font-size:0.7rem;font-family:'JetBrains Mono',monospace}
+    @media(max-width:800px){.sat-layout{grid-template-columns:1fr;height:auto}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(8,145,178,0.08)">🛰️</div>
+        <div><div class="nav-page-title">Satellite Imagery</div><div class="nav-page-sub">NASA EONET & GIBS Layers</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div><span class="badge badge-high" id="event-count">0 Events</span></div>
+  </nav>
+
+  <div class="sat-layout">
+    <div class="sat-map-panel">
+      <div class="card-header">🛰️ Satellite View — Multi-Layer Analysis</div>
+      <div id="sat-map" style="position:relative">
+        <div class="coord-display" id="coord-display">Lat: —, Lon: —</div>
+      </div>
+    </div>
+    <div class="sat-sidebar">
+      <div class="layer-card">
+        <div class="card-header">🗺️ Base Layer</div>
+        <div id="base-layers">
+          <div class="layer-option active" data-base="street"><div class="layer-radio"></div><div class="layer-info"><div class="layer-name">Street Map</div><div class="layer-desc">OpenStreetMap tiles</div></div></div>
+          <div class="layer-option" data-base="satellite"><div class="layer-radio"></div><div class="layer-info"><div class="layer-name">Satellite</div><div class="layer-desc">ESRI World Imagery</div></div></div>
+          <div class="layer-option" data-base="terrain"><div class="layer-radio"></div><div class="layer-info"><div class="layer-name">Terrain</div><div class="layer-desc">Topographic elevation map</div></div></div>
+          <div class="layer-option" data-base="dark"><div class="layer-radio"></div><div class="layer-info"><div class="layer-name">Dark Mode</div><div class="layer-desc">CartoDB Dark Matter</div></div></div>
+        </div>
+      </div>
+      <div class="layer-card">
+        <div class="card-header">🌍 NASA GIBS Overlays</div>
+        <div id="overlay-layers">
+          <div class="layer-option" data-overlay="modis"><div class="layer-radio"></div><div class="layer-info"><div class="layer-name">🔥 MODIS Thermal</div><div class="layer-desc">Thermal anomalies & fire detection</div></div></div>
+          <div class="layer-option" data-overlay="viirs"><div class="layer-radio"></div><div class="layer-info"><div class="layer-name">🌙 VIIRS Night Lights</div><div class="layer-desc">Power outage detection</div></div></div>
+          <div class="layer-option" data-overlay="precipitation"><div class="layer-radio"></div><div class="layer-info"><div class="layer-name">🌧️ Precipitation</div><div class="layer-desc">Global rainfall intensity</div></div></div>
+          <div class="layer-option" data-overlay="cloud"><div class="layer-radio"></div><div class="layer-info"><div class="layer-name">☁️ Cloud Cover</div><div class="layer-desc">Real-time cloud imagery</div></div></div>
+        </div>
+        <div class="opacity-slider">
+          <div class="opacity-label"><span>Overlay Opacity</span><span id="opacity-val">70%</span></div>
+          <input type="range" min="0" max="100" value="70" id="opacity-range"/>
+        </div>
+        <div class="date-control">
+          <label style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap">📅 Date:</label>
+          <input type="date" id="gibs-date"/>
+        </div>
+      </div>
+      <div class="layer-card">
+        <div class="card-header">🌋 Live NASA EONET Events</div>
+        <div id="eonet-list" style="max-height:300px;overflow-y:auto"><div style="padding:14px;text-align:center;color:var(--text-muted);font-size:0.78rem">Loading events...</div></div>
+        <div class="nasa-badge">🛰️ Data: NASA EONET v3 API</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    // Set date picker to yesterday (GIBS has ~1 day lag)
+    const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+    document.getElementById('gibs-date').value = yesterday;
+
+    const map = L.map('sat-map',{center:[20,0],zoom:3,zoomControl:true});
+
+    // Base layers
+    const baseLayers = {
+      street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}),
+      satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'© Esri',maxZoom:19}),
+      terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:'© OpenTopoMap',maxZoom:17}),
+      dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© CartoDB',maxZoom:19})
+    };
+    baseLayers.street.addTo(map);
+    let activeBase = 'street';
+
+    // GIBS overlay layers
+    function gibsUrl(layer, date) {
+      return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+    }
+    const overlayConfigs = {
+      modis: 'MODIS_Terra_CorrectedReflectance_TrueColor',
+      viirs: 'VIIRS_SNPP_DayNightBand_AtSensor_M15',
+      precipitation: 'IMERG_Precipitation_Rate',
+      cloud: 'MODIS_Aqua_CorrectedReflectance_TrueColor'
+    };
+    let activeOverlay = null;
+    let overlayLayer = null;
+
+    // Base layer switching
+    document.getElementById('base-layers').addEventListener('click', e => {
+      const opt = e.target.closest('.layer-option');
+      if (!opt) return;
+      const key = opt.dataset.base;
+      document.querySelectorAll('#base-layers .layer-option').forEach(o=>o.classList.remove('active'));
+      opt.classList.add('active');
+      map.removeLayer(baseLayers[activeBase]);
+      baseLayers[key].addTo(map);
+      activeBase = key;
+    });
+
+    // Overlay toggling
+    document.getElementById('overlay-layers').addEventListener('click', e => {
+      const opt = e.target.closest('.layer-option');
+      if (!opt) return;
+      const key = opt.dataset.overlay;
+      if (activeOverlay === key) {
+        opt.classList.remove('active');
+        if (overlayLayer) map.removeLayer(overlayLayer);
+        activeOverlay = null;
+        return;
+      }
+      document.querySelectorAll('#overlay-layers .layer-option').forEach(o=>o.classList.remove('active'));
+      opt.classList.add('active');
+      if (overlayLayer) map.removeLayer(overlayLayer);
+      const date = document.getElementById('gibs-date').value;
+      overlayLayer = L.tileLayer(gibsUrl(overlayConfigs[key], date), {
+        opacity: parseInt(document.getElementById('opacity-range').value)/100,
+        maxZoom: 9, bounds: [[-85.05,-180],[85.05,180]]
+      }).addTo(map);
+      activeOverlay = key;
+    });
+
+    // Opacity control
+    document.getElementById('opacity-range').addEventListener('input', e => {
+      const val = e.target.value;
+      document.getElementById('opacity-val').textContent = val+'%';
+      if (overlayLayer) overlayLayer.setOpacity(val/100);
+    });
+
+    // Date change
+    document.getElementById('gibs-date').addEventListener('change', () => {
+      if (activeOverlay) {
+        const opt = document.querySelector(`#overlay-layers .layer-option[data-overlay="${activeOverlay}"]`);
+        opt.click(); opt.click(); // toggle off/on to refresh
+      }
+    });
+
+    // Coord display
+    map.on('mousemove', e => {
+      document.getElementById('coord-display').textContent = `Lat: ${e.latlng.lat.toFixed(4)}, Lon: ${e.latlng.lng.toFixed(4)}`;
+    });
+
+    // Zone markers
+    async function loadZones() {
+      try {
+        const data = await (await fetch('/api/zones')).json();
+        data.zones.forEach(z => {
+          const sev = z.severity>=8?'#dc2626':z.severity>=6?'#ea580c':z.severity>=4?'#ca8a04':'#16a34a';
+          L.circleMarker([z.latitude,z.longitude],{radius:10,fillColor:sev,color:'#fff',weight:2,fillOpacity:0.7}).addTo(map)
+            .bindPopup(`<b style="color:${sev}">${z.name}</b><br>Severity: ${z.severity}/10<br>Pop: ${z.population.toLocaleString()}`);
+        });
+      } catch(e){}
+    }
+    loadZones();
+
+    // NASA EONET events
+    const EVENT_COLORS = {'Wildfires':'#dc2626','Severe Storms':'#7c3aed','Volcanoes':'#ea580c','Floods':'#2563eb','Earthquakes':'#ca8a04','Sea and Lake Ice':'#0891b2','Drought':'#a16207','Landslides':'#6b7280'};
+    const eonetLayer = L.layerGroup().addTo(map);
+
+    async function loadEONET() {
+      try {
+        const data = await (await fetch('/api/satellite/events')).json();
+        const events = data.events || [];
+        document.getElementById('event-count').textContent = events.length + ' Events';
+        const list = document.getElementById('eonet-list');
+        list.innerHTML = '';
+        events.forEach(evt => {
+          const cat = evt.categories?.[0]?.title || 'Unknown';
+          const color = EVENT_COLORS[cat] || '#6b7280';
+          const geo = evt.geometry?.[0];
+          if (geo?.coordinates) {
+            const [lng, lat] = geo.coordinates;
+            const marker = L.circleMarker([lat, lng], {radius:8, fillColor:color, color:color, weight:2, fillOpacity:0.4}).addTo(eonetLayer);
+            marker.bindPopup(`<b style="color:${color}">${evt.title}</b><br>Category: ${cat}<br>Source: NASA EONET`);
+          }
+          const div = document.createElement('div');
+          div.className = 'event-item';
+          div.innerHTML = `<div class="event-dot" style="background:${color}"></div><div class="event-info"><div class="event-title">${evt.title}</div><div class="event-meta">${cat}</div></div><span class="event-cat" style="background:${color}20;color:${color}">${cat.split(' ')[0]}</span>`;
+          div.addEventListener('click', () => {
+            const geo = evt.geometry?.[0];
+            if (geo?.coordinates) map.setView([geo.coordinates[1], geo.coordinates[0]], 6);
+          });
+          list.appendChild(div);
+        });
+      } catch(e) {
+        document.getElementById('eonet-list').innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-muted);font-size:0.78rem">Failed to load events</div>';
+      }
+    }
+    loadEONET();
+  </script>
+</body>
+</html>

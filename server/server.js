@@ -6,6 +6,13 @@ const url = require('url');
 const PORT = process.env.PORT || 3000;
 const zonesData = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/zones.json'), 'utf8'));
 
+// ─── In-Memory Stores ────────────────────────────────────────────────────────
+const sosBeacons = [];
+const volunteers = [];
+const alerts = [];
+const infraReports = [];
+const healthCases = [];
+
 // ─── Priority Score Engine ────────────────────────────────────────────────────
 function calcPriorityScore(zone, weatherRisk = 0) {
   const populationPressure = Math.min(zone.population / 15000, 1);
@@ -46,7 +53,6 @@ function allocateResources(rankedZones, resources) {
   let remaining = { ...resources };
   const allocations = [];
 
-  // Rescue teams: top zones with rescue need first
   const rescueQueue = [...rankedZones].filter(z => z.zone.rescueNeed > 0);
   let rescueLeft = remaining.rescueTeams;
   rescueQueue.forEach(rz => {
@@ -57,7 +63,6 @@ function allocateResources(rankedZones, resources) {
   });
   remaining.rescueTeams = rescueLeft;
 
-  // Ambulances: zones with high medical urgency
   const ambQueue = [...rankedZones].sort((a, b) =>
     b.scoreComponents.medicalUrgency - a.scoreComponents.medicalUrgency
   );
@@ -71,7 +76,6 @@ function allocateResources(rankedZones, resources) {
   });
   remaining.ambulances = ambLeft;
 
-  // Divisible resources: proportional by score * unmet need
   const totalScore = rankedZones.reduce((s, rz) => s + rz.score, 0);
   rankedZones.forEach(rz => {
     const share = rz.score / totalScore;
@@ -111,9 +115,7 @@ async function fetchWeather(lat, lon) {
     const wind = data.current?.windspeed_10m || 0;
     const risk = Math.min((rain * 0.4 + (wc > 60 ? 0.6 : wc > 40 ? 0.3 : 0) + wind / 200), 1);
     return {
-      weathercode: wc,
-      precipitation: rain,
-      windspeed: wind,
+      weathercode: wc, precipitation: rain, windspeed: wind,
       riskScore: parseFloat(risk.toFixed(2)),
       status: wc >= 80 ? 'Severe Storm' : wc >= 60 ? 'Heavy Rain' : wc >= 40 ? 'Moderate Rain' : 'Clear',
       source: 'Open-Meteo API'
@@ -125,15 +127,12 @@ async function fetchWeather(lat, lon) {
 
 async function fetchEarthquakes() {
   try {
-    const res = await fetch(
-      'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson'
-    );
+    const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson');
     const data = await res.json();
     return {
       count: data.features?.length || 0,
       recent: data.features?.slice(0, 3).map(f => ({
-        magnitude: f.properties.mag,
-        place: f.properties.place,
+        magnitude: f.properties.mag, place: f.properties.place,
         time: new Date(f.properties.time).toISOString()
       })) || [],
       source: 'USGS GeoJSON Feed'
@@ -143,89 +142,17 @@ async function fetchEarthquakes() {
   }
 }
 
-// ─── Route Handler ────────────────────────────────────────────────────────────
-async function handleRequest(req, res) {
-  const parsed = url.parse(req.url, true);
-  const pathname = parsed.pathname;
-
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
-
-  // Serve static frontend files
-  if (!pathname.startsWith('/api')) {
-    let filePath = path.join(__dirname, '../public', pathname === '/' ? 'index.html' : pathname);
-    if (!fs.existsSync(filePath)) filePath = path.join(__dirname, '../public/index.html');
-    const ext = path.extname(filePath);
-    const mimeTypes = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon' };
-    res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
-    fs.createReadStream(filePath).pipe(res);
-    return;
+async function fetchNasaEONET() {
+  try {
+    const res = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?limit=20&status=open');
+    const data = await res.json();
+    return { events: data.events || [], source: 'NASA EONET v3' };
+  } catch {
+    return { events: [], source: 'Fallback' };
   }
-
-  res.setHeader('Content-Type', 'application/json');
-
-  // GET /api/health
-  if (pathname === '/api/health' && req.method === 'GET') {
-    res.writeHead(200);
-    res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0', project: 'CrisisIQ' }));
-    return;
-  }
-
-  // GET /api/zones
-  if (pathname === '/api/zones' && req.method === 'GET') {
-    res.writeHead(200);
-    res.end(JSON.stringify({ zones: zonesData.zones, reliefHub: zonesData.reliefHub }));
-    return;
-  }
-
-  // GET /api/resources
-  if (pathname === '/api/resources' && req.method === 'GET') {
-    res.writeHead(200);
-    res.end(JSON.stringify({ defaultResources: zonesData.defaultResources }));
-    return;
-  }
-
-  // GET /api/plan (default resources)
-  if (pathname === '/api/plan' && req.method === 'GET') {
-    const plan = await buildPlan(zonesData.defaultResources);
-    res.writeHead(200);
-    res.end(JSON.stringify(plan));
-    return;
-  }
-
-  // POST /api/plan (custom resources)
-  if (pathname === '/api/plan' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
-      try {
-        const customResources = JSON.parse(body);
-        const resources = {
-          foodKits: parseInt(customResources.foodKits) || zonesData.defaultResources.foodKits,
-          waterUnits: parseInt(customResources.waterUnits) || zonesData.defaultResources.waterUnits,
-          medicalKits: parseInt(customResources.medicalKits) || zonesData.defaultResources.medicalKits,
-          rescueTeams: parseInt(customResources.rescueTeams) || zonesData.defaultResources.rescueTeams,
-          ambulances: parseInt(customResources.ambulances) || zonesData.defaultResources.ambulances
-        };
-        const plan = await buildPlan(resources);
-        res.writeHead(200);
-        res.end(JSON.stringify(plan));
-      } catch (e) {
-        res.writeHead(400);
-        res.end(JSON.stringify({ error: 'Invalid request body' }));
-      }
-    });
-    return;
-  }
-
-  res.writeHead(404);
-  res.end(JSON.stringify({ error: 'Not found' }));
 }
 
+// ─── Build Plan ───────────────────────────────────────────────────────────────
 async function buildPlan(resources) {
   const hub = zonesData.reliefHub;
   const [weather, earthquakes] = await Promise.all([
@@ -237,9 +164,7 @@ async function buildPlan(resources) {
     .map(zone => {
       const result = calcPriorityScore(zone, weather.riskScore);
       return {
-        zone,
-        score: result.total,
-        scoreComponents: result.components,
+        zone, score: result.total, scoreComponents: result.components,
         priority: zone.severity >= 8 ? 'CRITICAL' : zone.severity >= 6 ? 'HIGH' : zone.severity >= 4 ? 'MEDIUM' : 'LOW'
       };
     })
@@ -251,22 +176,199 @@ async function buildPlan(resources) {
   return {
     generatedAt: new Date().toISOString(),
     reliefHub: zonesData.reliefHub,
-    resources,
-    remainingResources: remaining,
-    weatherData: weather,
-    earthquakeData: earthquakes,
+    resources, remainingResources: remaining,
+    weatherData: weather, earthquakeData: earthquakes,
     totalAffectedPopulation: zonesData.zones.reduce((s, z) => s + z.population, 0),
     criticalZoneCount: zonesData.zones.filter(z => z.severity >= 8).length,
-    rankedZones: allocations,
-    decisionExplanation: explanation
+    rankedZones: allocations, decisionExplanation: explanation
   };
+}
+
+// ─── Helper: Parse JSON Body ──────────────────────────────────────────────────
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { reject(e); } });
+  });
+}
+
+function jsonRes(res, code, data) {
+  res.writeHead(code, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
+// ─── Route Handler ────────────────────────────────────────────────────────────
+async function handleRequest(req, res) {
+  const parsed = url.parse(req.url, true);
+  const pathname = parsed.pathname;
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+  // Serve static frontend files
+  if (!pathname.startsWith('/api')) {
+    let filePath = path.join(__dirname, '../public', pathname === '/' ? 'index.html' : pathname);
+    if (!fs.existsSync(filePath)) filePath = path.join(__dirname, '../public/index.html');
+    const ext = path.extname(filePath);
+    const mimeTypes = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg' };
+    res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
+    fs.createReadStream(filePath).pipe(res);
+    return;
+  }
+
+  res.setHeader('Content-Type', 'application/json');
+
+  try {
+    // ── Original Endpoints ──
+    if (pathname === '/api/health' && req.method === 'GET') {
+      return jsonRes(res, 200, { status: 'ok', timestamp: new Date().toISOString(), version: '2.5.0', project: 'CrisisIQ', modules: ['command-center','ai-chat','sos','convoys','analytics','scenarios','social-monitor','reports','satellite','volunteers','alerts','infrastructure','health-tracker'] });
+    }
+
+    if (pathname === '/api/zones' && req.method === 'GET') {
+      return jsonRes(res, 200, { zones: zonesData.zones, reliefHub: zonesData.reliefHub });
+    }
+
+    if (pathname === '/api/resources' && req.method === 'GET') {
+      return jsonRes(res, 200, { defaultResources: zonesData.defaultResources });
+    }
+
+    if (pathname === '/api/plan' && req.method === 'GET') {
+      const plan = await buildPlan(zonesData.defaultResources);
+      return jsonRes(res, 200, plan);
+    }
+
+    if (pathname === '/api/plan' && req.method === 'POST') {
+      const customResources = await parseBody(req);
+      const resources = {
+        foodKits: parseInt(customResources.foodKits) || zonesData.defaultResources.foodKits,
+        waterUnits: parseInt(customResources.waterUnits) || zonesData.defaultResources.waterUnits,
+        medicalKits: parseInt(customResources.medicalKits) || zonesData.defaultResources.medicalKits,
+        rescueTeams: parseInt(customResources.rescueTeams) || zonesData.defaultResources.rescueTeams,
+        ambulances: parseInt(customResources.ambulances) || zonesData.defaultResources.ambulances
+      };
+      const plan = await buildPlan(resources);
+      return jsonRes(res, 200, plan);
+    }
+
+    // ── SOS Beacon API ──
+    if (pathname === '/api/sos' && req.method === 'GET') {
+      return jsonRes(res, 200, { beacons: sosBeacons, total: sosBeacons.length });
+    }
+    if (pathname === '/api/sos' && req.method === 'POST') {
+      const beacon = await parseBody(req);
+      beacon.id = 'SOS-' + String(sosBeacons.length + 1).padStart(3, '0');
+      beacon.timestamp = new Date().toISOString();
+      beacon.status = beacon.status || 'active';
+      sosBeacons.unshift(beacon);
+      return jsonRes(res, 201, { success: true, beacon });
+    }
+
+    // ── Volunteer API ──
+    if (pathname === '/api/volunteers' && req.method === 'GET') {
+      return jsonRes(res, 200, { volunteers, total: volunteers.length });
+    }
+    if (pathname === '/api/volunteers' && req.method === 'POST') {
+      const vol = await parseBody(req);
+      vol.id = 'VOL-' + String(volunteers.length + 1).padStart(3, '0');
+      vol.registeredAt = new Date().toISOString();
+      vol.status = 'available';
+      vol.missionsCompleted = 0;
+      vol.hoursServed = 0;
+      volunteers.push(vol);
+      return jsonRes(res, 201, { success: true, volunteer: vol });
+    }
+    if (pathname === '/api/volunteers/match' && req.method === 'GET') {
+      const matches = volunteers.filter(v => v.status === 'available').map(v => {
+        const zone = zonesData.zones.find(z => {
+          if (v.skills?.includes('medical') && z.medicalNeed > 50) return true;
+          if (v.skills?.includes('rescue') && z.rescueNeed > 3) return true;
+          if (v.skills?.includes('logistics') && z.foodNeed > 500) return true;
+          return z.severity >= 7;
+        });
+        return { volunteer: v, suggestedZone: zone || zonesData.zones[0], matchScore: Math.random() * 40 + 60 };
+      });
+      return jsonRes(res, 200, { matches });
+    }
+
+    // ── Alert API ──
+    if (pathname === '/api/alerts' && req.method === 'GET') {
+      return jsonRes(res, 200, { alerts, total: alerts.length });
+    }
+    if (pathname === '/api/alerts' && req.method === 'POST') {
+      const alert = await parseBody(req);
+      alert.id = 'ALT-' + String(alerts.length + 1).padStart(3, '0');
+      alert.createdAt = new Date().toISOString();
+      alert.acknowledged = false;
+      alerts.unshift(alert);
+      return jsonRes(res, 201, { success: true, alert });
+    }
+
+    // ── Infrastructure API ──
+    if (pathname === '/api/infrastructure' && req.method === 'GET') {
+      return jsonRes(res, 200, { reports: infraReports, total: infraReports.length });
+    }
+    if (pathname === '/api/infrastructure' && req.method === 'POST') {
+      const report = await parseBody(req);
+      report.id = 'INF-' + String(infraReports.length + 1).padStart(3, '0');
+      report.reportedAt = new Date().toISOString();
+      infraReports.push(report);
+      return jsonRes(res, 201, { success: true, report });
+    }
+
+    // ── Health Tracker API ──
+    if (pathname === '/api/health-data' && req.method === 'GET') {
+      return jsonRes(res, 200, { cases: healthCases, total: healthCases.length });
+    }
+    if (pathname === '/api/health-data' && req.method === 'POST') {
+      const hcase = await parseBody(req);
+      hcase.id = 'HC-' + String(healthCases.length + 1).padStart(3, '0');
+      hcase.reportedAt = new Date().toISOString();
+      healthCases.push(hcase);
+      return jsonRes(res, 201, { success: true, case: hcase });
+    }
+
+    // ── NASA EONET Events ──
+    if (pathname === '/api/satellite/events' && req.method === 'GET') {
+      const data = await fetchNasaEONET();
+      return jsonRes(res, 200, data);
+    }
+
+    // ── Dashboard Stats ──
+    if (pathname === '/api/stats' && req.method === 'GET') {
+      return jsonRes(res, 200, {
+        zones: zonesData.zones.length,
+        population: zonesData.zones.reduce((s, z) => s + z.population, 0),
+        criticalZones: zonesData.zones.filter(z => z.severity >= 8).length,
+        activeBeacons: sosBeacons.filter(b => b.status === 'active').length,
+        volunteers: volunteers.length,
+        activeAlerts: alerts.filter(a => !a.acknowledged).length,
+        infraReports: infraReports.length,
+        healthCases: healthCases.length
+      });
+    }
+
+    jsonRes(res, 404, { error: 'Not found' });
+  } catch (e) {
+    console.error('API Error:', e);
+    jsonRes(res, 500, { error: 'Internal server error' });
+  }
 }
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 const server = http.createServer(handleRequest);
 server.listen(PORT, () => {
-  console.log(`\n🚨 CrisisIQ Server running at http://localhost:${PORT}`);
-  console.log(`   API Health:  http://localhost:${PORT}/api/health`);
-  console.log(`   Zones:       http://localhost:${PORT}/api/zones`);
-  console.log(`   Plan:        http://localhost:${PORT}/api/plan\n`);
+  console.log(`\n🚨 CrisisIQ Server v2.5 running at http://localhost:${PORT}`);
+  console.log(`   API Health:      http://localhost:${PORT}/api/health`);
+  console.log(`   Zones:           http://localhost:${PORT}/api/zones`);
+  console.log(`   Plan:            http://localhost:${PORT}/api/plan`);
+  console.log(`   SOS Beacons:     http://localhost:${PORT}/api/sos`);
+  console.log(`   Volunteers:      http://localhost:${PORT}/api/volunteers`);
+  console.log(`   Alerts:          http://localhost:${PORT}/api/alerts`);
+  console.log(`   Infrastructure:  http://localhost:${PORT}/api/infrastructure`);
+  console.log(`   Health Data:     http://localhost:${PORT}/api/health-data`);
+  console.log(`   Satellite:       http://localhost:${PORT}/api/satellite/events\n`);
 });

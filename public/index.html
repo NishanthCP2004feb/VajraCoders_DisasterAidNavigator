@@ -236,6 +236,54 @@
         <span class="card-tag tag-ai">NLP Analysis</span>
       </a>
 
+      <a class="feature-card" href="satellite.html" style="--card-accent:#0891b2; --icon-bg:rgba(8,145,178,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🛰️</div>
+        <div class="card-title">Satellite Imagery</div>
+        <div class="card-desc">NASA EONET events, GIBS overlays (thermal, night lights, precipitation), multi-layer satellite analysis.</div>
+        <span class="card-tag tag-live">NASA Live</span>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- Field Operations -->
+  <div class="features-section">
+    <div class="section-label">🛡️ Field Operations & Response</div>
+    <div class="feature-grid">
+
+      <a class="feature-card" href="alerts.html" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🔔</div>
+        <div class="card-title">Alert System</div>
+        <div class="card-desc">Multi-tier alert broadcasting with geofenced targeting, templates, audio alarms, and acknowledgment tracking.</div>
+        <span class="card-tag tag-live">Broadcasting</span>
+      </a>
+
+      <a class="feature-card" href="volunteers.html" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🤝</div>
+        <div class="card-title">Volunteer & NGO Hub</div>
+        <div class="card-desc">Register volunteers, AI skill-zone matching, deployment tracker, leaderboard, and contribution metrics.</div>
+        <span class="card-tag tag-ai">AI Matching</span>
+      </a>
+
+      <a class="feature-card" href="infrastructure.html" style="--card-accent:#ea580c; --icon-bg:rgba(234,88,12,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🏗️</div>
+        <div class="card-title">Infrastructure Assessment</div>
+        <div class="card-desc">Damage classification heatmap, building/road/hospital status tracking, and reconstruction cost estimation.</div>
+        <span class="card-tag tag-data">Assessment</span>
+      </a>
+
+      <a class="feature-card" href="health-tracker.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🧬</div>
+        <div class="card-title">Epidemic & Health Tracker</div>
+        <div class="card-desc">Post-disaster disease outbreak monitoring, epidemiological curves, medicine inventory, hospital capacity.</div>
+        <span class="card-tag tag-ai">Health Intel</span>
+      </a>
+
       <a class="feature-card" href="reports.html" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">📄</div>
@@ -247,12 +295,27 @@
     </div>
   </div>
 
+  <!-- Live Stats Ticker -->
+  <div class="stats-ticker" id="stats-ticker">
+    <div class="ticker-inner" id="ticker-inner"></div>
+  </div>
+
   <footer class="dash-footer">
-    CrisisIQ v2.0 — Real-Time Disaster Response Platform · 
+    CrisisIQ v2.5 — Real-Time Disaster Response Platform · 13 Integrated Modules · 
     <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> · 
     <a href="https://earthquake.usgs.gov" target="_blank">USGS</a> · 
+    <a href="https://eonet.gsfc.nasa.gov" target="_blank">NASA EONET</a> · 
     <a href="https://openstreetmap.org" target="_blank">OpenStreetMap</a>
   </footer>
+
+  <style>
+    .stats-ticker{overflow:hidden;background:var(--bg-card);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:8px 0;margin-top:10px}
+    .ticker-inner{display:flex;gap:40px;animation:ticker-scroll 30s linear infinite;white-space:nowrap;width:max-content}
+    .ticker-inner:hover{animation-play-state:paused}
+    @keyframes ticker-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+    .ticker-item{font-size:0.75rem;font-weight:500;color:var(--text-secondary);display:flex;align-items:center;gap:6px}
+    .ticker-dot{width:6px;height:6px;border-radius:50%}
+  </style>
 
   <script>
     function tick() {
@@ -260,6 +323,31 @@
         new Date().toLocaleTimeString('en-US', { hour12: false });
     }
     setInterval(tick, 1000); tick();
+
+    // Live stats ticker
+    async function loadTicker() {
+      try {
+        const stats = await (await fetch('/api/stats')).json();
+        const items = [
+          {dot:'#dc2626',text:`🔴 ${stats.criticalZones} Critical Zones Active`},
+          {dot:'#ea580c',text:`👥 ${stats.population?.toLocaleString()} People Affected`},
+          {dot:'#16a34a',text:`📡 ${stats.zones} Monitored Zones`},
+          {dot:'#2563eb',text:`🆘 ${stats.activeBeacons} Active SOS Beacons`},
+          {dot:'#7c3aed',text:`🤝 ${stats.volunteers} Registered Volunteers`},
+          {dot:'#dc2626',text:`🔔 ${stats.activeAlerts} Unacknowledged Alerts`},
+          {dot:'#ea580c',text:`🏗️ ${stats.infraReports} Infrastructure Reports`},
+          {dot:'#0891b2',text:`🧬 ${stats.healthCases} Health Cases Tracked`},
+          {dot:'#16a34a',text:`✅ All Systems Operational`},
+          {dot:'#7c3aed',text:`🕐 ${new Date().toLocaleString()}`},
+        ];
+        const html = items.map(i => `<span class="ticker-item"><span class="ticker-dot" style="background:${i.dot}"></span>${i.text}</span>`).join('');
+        document.getElementById('ticker-inner').innerHTML = html + html; // duplicate for seamless scroll
+      } catch(e) {
+        document.getElementById('ticker-inner').innerHTML = '<span class="ticker-item">Loading live statistics...</span>';
+      }
+    }
+    loadTicker();
+    setInterval(loadTicker, 30000);
   </script>
 </body>
 </html>

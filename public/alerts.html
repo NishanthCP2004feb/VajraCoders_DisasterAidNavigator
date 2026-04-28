@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Alert System — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .alert-layout{display:grid;grid-template-columns:380px 1fr;gap:14px;padding:14px 20px;min-height:calc(100vh - 54px)}
+    .alert-composer{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow-y:auto;box-shadow:var(--shadow)}
+    .composer-body{padding:16px;display:flex;flex-direction:column;gap:14px}
+    .form-group{display:flex;flex-direction:column;gap:4px}
+    .form-label{font-size:0.75rem;font-weight:600;color:var(--text-secondary)}
+    .form-input,.form-select,.form-textarea{border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:0.85rem;font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);outline:none;transition:border-color 0.2s}
+    .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+    .form-textarea{resize:vertical;min-height:80px}
+    .tier-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .tier-opt{text-align:center;padding:12px 8px;border:2px solid var(--border);border-radius:10px;cursor:pointer;transition:all 0.25s}
+    .tier-opt:hover{border-color:var(--border-bright)}
+    .tier-opt.selected{border-width:2px}
+    .tier-opt .tier-icon{font-size:1.5rem;margin-bottom:4px}
+    .tier-opt .tier-name{font-size:0.75rem;font-weight:700}
+    .tier-opt .tier-desc{font-size:0.62rem;color:var(--text-muted)}
+    .tier-emergency{--tc:#dc2626}.tier-emergency.selected{border-color:#dc2626;background:rgba(220,38,38,0.05)}
+    .tier-warning{--tc:#ea580c}.tier-warning.selected{border-color:#ea580c;background:rgba(234,88,12,0.05)}
+    .tier-advisory{--tc:#ca8a04}.tier-advisory.selected{border-color:#ca8a04;background:rgba(202,138,4,0.05)}
+    .tier-info{--tc:#2563eb}.tier-info.selected{border-color:#2563eb;background:rgba(37,99,235,0.05)}
+    .zone-chips{display:flex;flex-wrap:wrap;gap:6px}
+    .zone-chip{padding:4px 10px;border:1px solid var(--border);border-radius:16px;font-size:0.72rem;cursor:pointer;transition:all 0.2s;color:var(--text-secondary)}
+    .zone-chip:hover{border-color:var(--accent)}
+    .zone-chip.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn-broadcast{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:0.5px;width:100%}
+    .btn-broadcast:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(220,38,38,0.35)}
+    .template-list{display:flex;flex-direction:column;gap:6px}
+    .template-btn{padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;font-size:0.75rem;color:var(--text-secondary);cursor:pointer;transition:all 0.2s;text-align:left;font-family:'Inter',sans-serif}
+    .template-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .alert-feed{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .alert-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);animation:alert-in 0.4s ease}
+    @keyframes alert-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+    .alert-stripe{height:4px}
+    .alert-body{padding:14px 16px}
+    .alert-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .alert-tier{font-size:0.68rem;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:4px;letter-spacing:0.5px}
+    .alert-time{font-size:0.68rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+    .alert-title{font-size:1rem;font-weight:700;margin-bottom:4px}
+    .alert-msg{font-size:0.82rem;color:var(--text-secondary);line-height:1.5;margin-bottom:8px}
+    .alert-zones{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+    .alert-zone-tag{padding:2px 7px;background:var(--bg-primary);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;color:var(--text-muted)}
+    .alert-actions{display:flex;gap:8px}
+    .alert-ack{padding:5px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;background:var(--bg-primary);color:var(--text-secondary);transition:all 0.2s;font-family:'Inter',sans-serif}
+    .alert-ack:hover{border-color:#16a34a;color:#16a34a}
+    .alert-ack.done{background:rgba(22,163,74,0.1);color:#16a34a;border-color:#16a34a}
+    .audio-toggle{display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--text-muted);cursor:pointer;padding:6px 0}
+    .audio-toggle input{accent-color:var(--critical)}
+    .alert-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 0 10px}
+    .alert-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;box-shadow:var(--shadow)}
+    .alert-stat-val{font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .alert-stat-key{font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    @media(max-width:800px){.alert-layout{grid-template-columns:1fr}.alert-stats{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(220,38,38,0.08)">🔔</div>
+        <div><div class="nav-page-title">Alert System</div><div class="nav-page-sub">Multi-Channel Broadcasting</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="alert-layout">
+    <div class="alert-composer">
+      <div class="card-header">📝 Compose Alert</div>
+      <div class="composer-body">
+        <div class="form-group">
+          <div class="form-label">Alert Tier</div>
+          <div class="tier-options" id="tier-options">
+            <div class="tier-opt tier-emergency selected" data-tier="emergency"><div class="tier-icon">🚨</div><div class="tier-name" style="color:#dc2626">Emergency</div><div class="tier-desc">Life-threatening</div></div>
+            <div class="tier-opt tier-warning" data-tier="warning"><div class="tier-icon">⚠️</div><div class="tier-name" style="color:#ea580c">Warning</div><div class="tier-desc">Imminent danger</div></div>
+            <div class="tier-opt tier-advisory" data-tier="advisory"><div class="tier-icon">📋</div><div class="tier-name" style="color:#ca8a04">Advisory</div><div class="tier-desc">Precautionary</div></div>
+            <div class="tier-opt tier-info" data-tier="info"><div class="tier-icon">ℹ️</div><div class="tier-name" style="color:#2563eb">Info</div><div class="tier-desc">General update</div></div>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="alert-title" placeholder="Alert headline..." required/></div>
+        <div class="form-group"><label class="form-label">Message</label><textarea class="form-textarea" id="alert-msg" placeholder="Detailed alert message..."></textarea></div>
+        <div class="form-group">
+          <label class="form-label">Target Zones (click to select)</label>
+          <div class="zone-chips" id="zone-chips"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quick Templates</label>
+          <div class="template-list">
+            <button class="template-btn" data-title="EVACUATE IMMEDIATELY" data-msg="All residents in selected zones must evacuate immediately. Move to nearest designated shelter. Do NOT return until all-clear is issued." data-tier="emergency">🚨 Evacuation Order</button>
+            <button class="template-btn" data-title="Shelter-in-Place Advisory" data-msg="Remain indoors. Seal doors and windows. Monitor official channels for updates." data-tier="warning">⚠️ Shelter-in-Place</button>
+            <button class="template-btn" data-title="Boil Water Advisory" data-msg="Water contamination detected. All water must be boiled before consumption. Distribution points active at shelters." data-tier="advisory">💧 Boil Water Advisory</button>
+            <button class="template-btn" data-title="Road Reopening Notice" data-msg="Roads cleared and reopened for essential traffic. Exercise caution. Debris cleanup ongoing." data-tier="info">🛤️ Road Reopened</button>
+          </div>
+        </div>
+        <label class="audio-toggle"><input type="checkbox" id="audio-enabled" checked/> 🔊 Play alarm for Emergency alerts</label>
+        <button class="btn-broadcast" id="btn-broadcast">🔔 BROADCAST ALERT</button>
+      </div>
+    </div>
+
+    <div class="alert-feed">
+      <div class="alert-stats">
+        <div class="alert-stat"><div class="alert-stat-val" style="color:#dc2626" id="stat-emergency">0</div><div class="alert-stat-key">Emergency</div></div>
+        <div class="alert-stat"><div class="alert-stat-val" style="color:#ea580c" id="stat-warning">0</div><div class="alert-stat-key">Warnings</div></div>
+        <div class="alert-stat"><div class="alert-stat-val" style="color:#ca8a04" id="stat-advisory">0</div><div class="alert-stat-key">Advisories</div></div>
+        <div class="alert-stat"><div class="alert-stat-val" style="color:#2563eb" id="stat-info">0</div><div class="alert-stat-key">Info</div></div>
+      </div>
+      <div class="section-title">📡 Alert Feed</div>
+      <div id="alert-list"></div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const TIER_COLORS = {emergency:'#dc2626',warning:'#ea580c',advisory:'#ca8a04',info:'#2563eb'};
+    const TIER_LABELS = {emergency:'🚨 EMERGENCY',warning:'⚠️ WARNING',advisory:'📋 ADVISORY',info:'ℹ️ INFO'};
+    let selectedTier = 'emergency';
+    let selectedZones = new Set();
+    let alertsList = [];
+    let stats = {emergency:0,warning:0,advisory:0,info:0};
+
+    // Audio context for alarm
+    let audioCtx;
+    function playAlarm() {
+      if (!document.getElementById('audio-enabled').checked) return;
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.type = 'square'; osc.frequency.value = 800;
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+      osc.start(); osc.stop(audioCtx.currentTime + 1.5);
+      setTimeout(() => {
+        const osc2 = audioCtx.createOscillator();
+        const g2 = audioCtx.createGain();
+        osc2.connect(g2); g2.connect(audioCtx.destination);
+        osc2.type = 'square'; osc2.frequency.value = 1000;
+        g2.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        g2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+        osc2.start(); osc2.stop(audioCtx.currentTime + 1);
+      }, 500);
+    }
+
+    // Load zones for targeting
+    async function loadZones() {
+      try {
+        const data = await (await fetch('/api/zones')).json();
+        const chips = document.getElementById('zone-chips');
+        chips.innerHTML = '<div class="zone-chip selected" data-zone="ALL">📡 All Zones</div>';
+        selectedZones.add('ALL');
+        data.zones.forEach(z => {
+          chips.innerHTML += `<div class="zone-chip" data-zone="${z.id}">${z.name}</div>`;
+        });
+      } catch(e){}
+    }
+    loadZones();
+
+    // Zone chip selection
+    document.getElementById('zone-chips').addEventListener('click', e => {
+      const chip = e.target.closest('.zone-chip');
+      if (!chip) return;
+      const zone = chip.dataset.zone;
+      if (zone === 'ALL') {
+        document.querySelectorAll('.zone-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        selectedZones.clear(); selectedZones.add('ALL');
+      } else {
+        document.querySelector('.zone-chip[data-zone="ALL"]')?.classList.remove('selected');
+        selectedZones.delete('ALL');
+        chip.classList.toggle('selected');
+        if (chip.classList.contains('selected')) selectedZones.add(zone); else selectedZones.delete(zone);
+      }
+    });
+
+    // Tier selection
+    document.getElementById('tier-options').addEventListener('click', e => {
+      const opt = e.target.closest('.tier-opt');
+      if (!opt) return;
+      document.querySelectorAll('.tier-opt').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      selectedTier = opt.dataset.tier;
+    });
+
+    // Templates
+    document.querySelectorAll('.template-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('alert-title').value = btn.dataset.title;
+        document.getElementById('alert-msg').value = btn.dataset.msg;
+        const tier = btn.dataset.tier;
+        document.querySelectorAll('.tier-opt').forEach(o => o.classList.remove('selected'));
+        document.querySelector(`.tier-opt[data-tier="${tier}"]`).classList.add('selected');
+        selectedTier = tier;
+      });
+    });
+
+    // Broadcast
+    document.getElementById('btn-broadcast').addEventListener('click', async () => {
+      const title = document.getElementById('alert-title').value.trim();
+      const msg = document.getElementById('alert-msg').value.trim();
+      if (!title) return alert('Enter alert title');
+      const alertData = { tier: selectedTier, title, message: msg, zones: [...selectedZones] };
+      try { await fetch('/api/alerts', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(alertData) }); } catch(e){}
+      alertData.id = 'ALT-' + String(alertsList.length+1).padStart(3,'0');
+      alertData.createdAt = new Date().toISOString();
+      alertData.acknowledged = false;
+      alertsList.unshift(alertData);
+      stats[selectedTier]++;
+      renderAlerts();
+      if (selectedTier === 'emergency') playAlarm();
+      document.getElementById('alert-title').value = '';
+      document.getElementById('alert-msg').value = '';
+    });
+
+    function renderAlerts() {
+      Object.keys(stats).forEach(k => document.getElementById('stat-'+k).textContent = stats[k]);
+      const list = document.getElementById('alert-list');
+      list.innerHTML = alertsList.map((a, i) => {
+        const color = TIER_COLORS[a.tier];
+        const label = TIER_LABELS[a.tier];
+        const time = new Date(a.createdAt).toLocaleTimeString('en-US',{hour12:false});
+        return `<div class="alert-card">
+          <div class="alert-stripe" style="background:${color}"></div>
+          <div class="alert-body">
+            <div class="alert-top"><span class="alert-tier" style="background:${color}15;color:${color}">${label}</span><span class="alert-time">${time}</span></div>
+            <div class="alert-title">${a.title}</div>
+            <div class="alert-msg">${a.message || ''}</div>
+            <div class="alert-zones">${a.zones.map(z=>`<span class="alert-zone-tag">${z}</span>`).join('')}</div>
+            <div class="alert-actions"><button class="alert-ack ${a.acknowledged?'done':''}" onclick="ackAlert(${i})">${a.acknowledged?'✅ Acknowledged':'Acknowledge'}</button></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    window.ackAlert = function(idx) {
+      alertsList[idx].acknowledged = true;
+      renderAlerts();
+    };
+
+    // Pre-populate demo alerts
+    [{tier:'emergency',title:'FLASH FLOOD WARNING',message:'Severe flash flooding imminent in Riverside Delta and Old Fisherman Port. Evacuate low-lying areas immediately.',zones:['Z001','Z004']},
+     {tier:'warning',title:'Road Closure — NH-45',message:'National Highway 45 closed due to debris. Alternative route via Industrial Road.',zones:['Z002','Z004']},
+     {tier:'advisory',title:'Water Quality Advisory',message:'Water contamination detected in Northern Farmlands supply. Use bottled water or boil before consumption.',zones:['Z007']},
+     {tier:'info',title:'Shelter B Now Open',message:'Additional shelter capacity available at Community Center B, Market Square. 200 beds available.',zones:['Z003']}
+    ].forEach(a => {
+      a.id = 'ALT-D' + String(alertsList.length+1).padStart(2,'0');
+      a.createdAt = new Date(Date.now() - Math.random()*3600000).toISOString();
+      a.acknowledged = false;
+      alertsList.push(a);
+      stats[a.tier]++;
+    });
+    renderAlerts();
+  </script>
+</body>
+</html>
