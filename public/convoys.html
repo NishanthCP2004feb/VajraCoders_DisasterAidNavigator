@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Convoy Tracker — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .convoy-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
+    .convoy-map-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+    #convoy-map{flex:1;min-height:300px}
+    .convoy-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .convoy-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow);transition:all 0.2s;cursor:pointer}
+    .convoy-card:hover{border-color:var(--border-bright);box-shadow:var(--shadow-lg)}
+    .convoy-card.active{border-color:var(--accent);border-width:2px}
+    .convoy-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .convoy-id{font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:6px}
+    .convoy-status{padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;text-transform:uppercase}
+    .status-transit{background:rgba(37,99,235,0.1);color:#2563eb;animation:blink 1.5s infinite}
+    .status-delivered{background:rgba(22,163,74,0.1);color:#16a34a}
+    .status-preparing{background:rgba(202,138,4,0.1);color:#a16207}
+    .convoy-dest{font-size:0.78rem;color:var(--text-secondary);margin-bottom:6px}
+    .convoy-cargo{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+    .cargo-tag{background:var(--bg-primary);border:1px solid var(--border);padding:2px 7px;border-radius:5px;font-size:0.68rem;color:var(--text-secondary)}
+    .convoy-progress{background:var(--bg-primary);border-radius:4px;height:6px;overflow:hidden;margin-bottom:4px}
+    .convoy-progress-fill{height:100%;border-radius:4px;transition:width 1s ease}
+    .convoy-eta{font-size:0.7rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;display:flex;justify-content:space-between}
+    .btn-dispatch{width:100%;margin-top:6px}
+    .dispatch-controls{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow)}
+    .dispatch-controls .form-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);margin-bottom:4px}
+    .dispatch-controls select,.dispatch-controls input{width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.82rem;background:var(--bg-primary);color:var(--text-primary);outline:none;margin-bottom:8px;font-family:'Inter',sans-serif}
+    @media(max-width:800px){.convoy-layout{grid-template-columns:1fr;height:auto}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(234,88,12,0.08)">🚛</div>
+        <div><div class="nav-page-title">Convoy Tracker</div><div class="nav-page-sub">Real-Time Resource Delivery</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="convoy-layout">
+    <div class="convoy-map-panel">
+      <div class="card-header">🗺️ Convoy Map — Live Tracking</div>
+      <div id="convoy-map"></div>
+    </div>
+    <div class="convoy-sidebar">
+      <div class="dispatch-controls">
+        <div class="form-label">🚛 Quick Dispatch</div>
+        <select id="disp-zone"><option value="">Select destination zone...</option></select>
+        <select id="disp-type"><option value="ambulance">🚑 Ambulance</option><option value="supply">🚛 Supply Truck</option><option value="rescue">🚒 Rescue Team</option></select>
+        <button class="btn-primary btn-dispatch" id="btn-dispatch">🚀 Dispatch Convoy</button>
+      </div>
+      <div class="section-title">Active Convoys</div>
+      <div id="convoy-list"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const map = L.map('convoy-map',{center:[13.08,80.27],zoom:11});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+
+    const HUB = { lat:13.0674, lng:80.2376, name:'Central Command Hub' };
+    const CONVOY_TYPES = {
+      ambulance: { icon:'🚑', color:'#dc2626', speed:0.0008 },
+      supply: { icon:'🚛', color:'#ea580c', speed:0.0005 },
+      rescue: { icon:'🚒', color:'#2563eb', speed:0.0006 }
+    };
+
+    // Hub marker
+    L.marker([HUB.lat, HUB.lng], {
+      icon: L.divIcon({ html:'<div style="background:#7c3aed;color:#fff;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(124,58,237,0.4)">🏠</div>', className:'', iconSize:[30,30], iconAnchor:[15,15] })
+    }).addTo(map).bindPopup('<b style="color:#7c3aed">🏠 Central Command Hub</b>');
+
+    let convoys = [];
+    let zoneData = [];
+    let convoyId = 0;
+
+    async function loadZones() {
+      try {
+        const res = await fetch('/api/zones');
+        const data = await res.json();
+        zoneData = data.zones;
+        const sel = document.getElementById('disp-zone');
+        zoneData.forEach(z => { const o = document.createElement('option'); o.value = z.id; o.textContent = z.name + ' (' + z.district + ')'; sel.appendChild(o); });
+        // Add zone markers
+        zoneData.forEach(z => {
+          const sev = z.severity >= 8 ? '#dc2626' : z.severity >= 6 ? '#ea580c' : z.severity >= 4 ? '#ca8a04' : '#16a34a';
+          L.circleMarker([z.latitude, z.longitude], { radius:8, fillColor:sev, color:sev, weight:2, fillOpacity:0.3 }).addTo(map).bindPopup(`<b>${z.name}</b><br>Severity: ${z.severity}/10`);
+        });
+      } catch(e) { console.error(e); }
+    }
+    loadZones();
+
+    // Dispatch
+    document.getElementById('btn-dispatch').addEventListener('click', () => {
+      const zoneId = document.getElementById('disp-zone').value;
+      const type = document.getElementById('disp-type').value;
+      if (!zoneId) return alert('Select a destination zone');
+      const zone = zoneData.find(z => z.id === zoneId);
+      if (!zone) return;
+      createConvoy(type, zone);
+    });
+
+    function createConvoy(type, destZone) {
+      convoyId++;
+      const cfg = CONVOY_TYPES[type];
+      const convoy = {
+        id: 'CV-' + String(convoyId).padStart(3,'0'),
+        type, icon: cfg.icon, color: cfg.color,
+        dest: destZone,
+        progress: 0, speed: cfg.speed,
+        status: 'transit',
+        startLat: HUB.lat, startLng: HUB.lng,
+        curLat: HUB.lat, curLng: HUB.lng,
+        cargo: type === 'supply' ? ['🍱 200 Food', '💧 400 Water', '🏥 50 Medical'] : type === 'ambulance' ? ['🏥 Medical Team', '💉 Emergency Supplies'] : ['👷 5 Rescuers', '🔧 Equipment'],
+        marker: null, line: null
+      };
+      // Route line
+      convoy.line = L.polyline([[HUB.lat, HUB.lng], [destZone.latitude, destZone.longitude]], { color: cfg.color, weight:2, opacity:0.4, dashArray:'8,6' }).addTo(map);
+      // Moving marker
+      convoy.marker = L.marker([HUB.lat, HUB.lng], {
+        icon: L.divIcon({ html:`<div style="background:${cfg.color};color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px ${cfg.color}66;border:2px solid #fff">${cfg.icon}</div>`, className:'', iconSize:[28,28], iconAnchor:[14,14] })
+      }).addTo(map).bindPopup(`<b>${convoy.id}</b><br>${cfg.icon} → ${destZone.name}`);
+      convoys.push(convoy);
+      renderConvoyList();
+    }
+
+    // Animation loop
+    function animateConvoys() {
+      convoys.forEach(c => {
+        if (c.status !== 'transit') return;
+        c.progress = Math.min(c.progress + c.speed + Math.random()*0.0002, 1);
+        c.curLat = c.startLat + (c.dest.latitude - c.startLat) * c.progress;
+        c.curLng = c.startLng + (c.dest.longitude - c.startLng) * c.progress;
+        c.marker.setLatLng([c.curLat, c.curLng]);
+        if (c.progress >= 1) {
+          c.status = 'delivered';
+          c.marker.setPopupContent(`<b style="color:#16a34a">✅ ${c.id} — Delivered</b><br>${c.dest.name}`);
+        }
+      });
+      renderConvoyList();
+      requestAnimationFrame(animateConvoys);
+    }
+    animateConvoys();
+
+    function renderConvoyList() {
+      const list = document.getElementById('convoy-list');
+      if (!convoys.length) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.82rem">No active convoys. Dispatch one above.</div>'; return; }
+      list.innerHTML = convoys.map(c => {
+        const pct = (c.progress * 100).toFixed(0);
+        const eta = c.status === 'delivered' ? 'Arrived' : Math.ceil((1 - c.progress) * 15) + ' min';
+        const statusClass = c.status === 'delivered' ? 'status-delivered' : 'status-transit';
+        return `<div class="convoy-card ${c.status==='transit'?'active':''}">
+          <div class="convoy-header"><span class="convoy-id">${c.icon} ${c.id}</span><span class="convoy-status ${statusClass}">${c.status}</span></div>
+          <div class="convoy-dest">→ ${c.dest.name} (${c.dest.district})</div>
+          <div class="convoy-cargo">${c.cargo.map(x=>`<span class="cargo-tag">${x}</span>`).join('')}</div>
+          <div class="convoy-progress"><div class="convoy-progress-fill" style="width:${pct}%;background:${c.color}"></div></div>
+          <div class="convoy-eta"><span>${pct}% complete</span><span>ETA: ${eta}</span></div>
+        </div>`;
+      }).join('');
+    }
+    renderConvoyList();
+
+    // Pre-dispatch demo convoys
+    setTimeout(() => {
+      if (zoneData.length >= 2) {
+        createConvoy('ambulance', zoneData[0]);
+        setTimeout(() => createConvoy('supply', zoneData[3]), 500);
+        setTimeout(() => createConvoy('rescue', zoneData[1]), 1000);
+      }
+    }, 1500);
+  </script>
+</body>
+</html>

@@ -1,146 +1,115 @@
-# DisasterAid Navigator
+# 🚨 CrisisIQ — Real-Time Disaster Response Coordinator
 
-An intelligent decision-support dashboard for emergency relief prioritization and resource allocation.
+AI-powered disaster response command center that helps relief teams decide **which zones need help first** and **how to distribute limited resources** optimally during natural disasters.
 
-The app ranks affected disaster zones, explains why each zone is prioritized, and allocates limited food, water, medical kits, rescue teams, and ambulances. It is designed as a hackathon-ready project that can run locally, be pushed to a public GitHub repository, and deploy directly to Render.
+![Dashboard](https://img.shields.io/badge/Dashboard-Live_Map-blue) ![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![License](https://img.shields.io/badge/License-MIT-yellow) ![No API Keys](https://img.shields.io/badge/API_Keys-Not_Required-brightgreen)
 
-## Features
+---
 
-- Interactive Leaflet map with affected zones and top dispatch routes
-- Priority score engine using severity, population, vulnerability, access, medical urgency, reports, shelter gap, and weather risk
-- Resource allocation engine for food, water, medical kits, rescue teams, and ambulances
-- Decision explanation for every ranked zone
-- Three decision strategies: balanced response, equity guardrail, and fastest stabilization
-- Fairness audit for high-vulnerability zones
-- Bottleneck radar for unmet food, water, medical, rescue, and ambulance demand
-- Dispatch mission cards with ETA, route distance, resources, and field objective
-- Scenario stress test comparing resource shock, current inventory, and supply surge
-- Downloadable JSON situation report for judges or responders
-- Icon-based command dashboard with separate pages for every advanced feature
-- Multi-agent command council with medical, logistics, equity, and risk agents
-- Six-hour disaster simulation for severity, medical pressure, roads, and shelter stress
-- Counterfactual lab showing what would change zone rankings
-- Citizen report intelligence endpoint for classifying field reports
-- Cascading risk graph for spillover and evacuation dependencies
-- Shelter evacuation decision engine
-- Live public data where available:
-  - Open-Meteo weather API, no key required
-  - USGS significant earthquake GeoJSON feed, no key required
-- Fallback demo data when external APIs are unavailable
-- No required API keys for the MVP
+## ✨ Features
 
-## Tech Stack
+- **Interactive Disaster Map** — Leaflet.js + OpenStreetMap with color-coded zone markers, relief hub, and route lines
+- **Priority Score Engine** — Weighted 8-factor formula ranks zones by urgency
+- **Smart Resource Allocation** — Distributes food, water, medical kits, rescue teams, and ambulances based on priority + unmet need
+- **Live Weather Data** — Open-Meteo API (no key required)
+- **Live Earthquake Data** — USGS GeoJSON feed (no key required)
+- **Scenario Replay Mode** — Simulated Hurricane Atlas unfolds in real-time across the dashboard
+- **Zone Detail Modal** — Click any zone for full breakdown with score component mini-bars
+- **Resource Utilization Bars** — Visual usage indicators for each resource type
+- **Live Event Feed** — Auto-scrolling simulated emergency events
+- **Export Plan as JSON** — Download the allocation plan for reporting
+- **Responsive Design** — Works on desktop and mobile
+- **Fallback Data** — Works even if live APIs are unavailable
 
-- Node.js HTTP server with no runtime dependencies
-- HTML, CSS, and vanilla JavaScript frontend
-- Leaflet and OpenStreetMap tiles for mapping
-- JSON sample datasets for disaster zones and resource inventory
-- Render-ready `render.yaml`
+---
 
-## Run Locally
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Node.js (native `http` module) |
+| Frontend | Vanilla HTML, CSS, JavaScript |
+| Map | Leaflet.js + OpenStreetMap + CARTO dark tiles |
+| Weather API | [Open-Meteo](https://open-meteo.com) (free, no key) |
+| Seismic API | [USGS Earthquake Feed](https://earthquake.usgs.gov) (free, no key) |
+| Fonts | Inter + JetBrains Mono (Google Fonts) |
+| Deploy | Render (render.yaml included) |
+
+---
+
+## 🚀 Quick Start
 
 ```bash
+# Clone the repo
+git clone https://github.com/YOUR_USERNAME/CrisisIQ.git
+cd CrisisIQ
+
+# Install dependencies
 npm install
+
+# Start the server
 npm start
 ```
 
-Open:
+Open **http://localhost:3000** in your browser.
 
-```text
-http://localhost:3000
+> **No API keys required!** The project works out of the box with free public APIs and built-in fallback data.
+
+---
+
+## 📡 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Server health check |
+| GET | `/api/zones` | Get all disaster zones + relief hub |
+| GET | `/api/resources` | Get default resource inventory |
+| GET | `/api/plan` | Generate plan with default resources |
+| POST | `/api/plan` | Generate plan with custom resources |
+
+### POST `/api/plan` Body
+
+```json
+{
+  "foodKits": 3000,
+  "waterUnits": 6000,
+  "medicalKits": 500,
+  "rescueTeams": 15,
+  "ambulances": 20
+}
 ```
 
-## API Endpoints
+---
 
-```text
-GET  /api/health
-GET  /api/zones
-GET  /api/resources
-POST /api/plan
-POST /api/report
+## 🧮 Priority Score Model
+
+Each zone receives a priority score (0–1) using a weighted formula:
+
+```
+Priority = severity × 0.27
+         + population_pressure × 0.15
+         + vulnerability_share × 0.16
+         + access_difficulty × 0.14
+         + medical_urgency × 0.11
+         + incident_reports × 0.08
+         + shelter_gap × 0.05
+         + weather_risk × 0.04
 ```
 
-Example plan request:
+---
 
-```bash
-curl -X POST http://localhost:3000/api/plan \
-  -H "Content-Type: application/json" \
-  -d "{\"strategy\":\"equity\",\"resources\":{\"foodKits\":4200,\"waterUnits\":6500,\"medicalKits\":1700,\"rescueTeams\":14,\"ambulances\":6}}"
-```
+## ☁️ Deploy on Render
 
-## Decision Model
+1. Push this repo to GitHub
+2. Go to [Render Dashboard](https://dashboard.render.com)
+3. Click **New → Blueprint**
+4. Connect your GitHub repo
+5. Render will auto-detect `render.yaml` and deploy
 
-The priority score uses weighted multi-criteria decision analysis. The default balanced strategy is:
+Or manually: **New → Web Service** → connect repo → build: `npm install` → start: `npm start`
 
-```text
-priority =
-  severity * 0.27
-+ population pressure * 0.15
-+ vulnerability share * 0.16
-+ access difficulty * 0.14
-+ medical urgency * 0.11
-+ incident reports * 0.08
-+ shelter gap * 0.05
-+ weather risk * 0.04
-```
+---
 
-The dashboard also includes an equity strategy and a speed strategy. Each strategy changes the weights while keeping the same explainable score components, so users can compare how priorities shift under different operational goals.
+## 📄 License
 
-The allocation model distributes divisible resources by priority and then assigns remaining supply to unmet need in rank order. Rescue teams and ambulances are assigned as integer resources to the highest-priority and highest-medical-urgency zones.
-
-## Hackathon Differentiators
-
-- Explainable scoring instead of a black-box rank
-- Separate routed pages for advanced features instead of one crowded dashboard
-- AI command council that combines multiple specialized decision agents
-- Forward simulation that projects how risk evolves over the next 6 hours
-- Counterfactual explanations that show what would change the decision
-- Citizen report analysis with credibility and urgency scoring
-- Cascading risk graph for non-obvious zone dependencies
-- Evacuation routing based on shelter overflow and accessible capacity
-- Fairness guardrail that checks whether vulnerable zones receive a proportional share of support
-- Stress-test mode to show how the plan changes during resource scarcity or supply surge
-- Mission-level outputs that convert analytics into field tasks
-- Works without paid APIs or secret keys
-- Render-ready and public GitHub-ready
-
-## Feature Pages
-
-```text
-/                               Command dashboard
-/features/operations             Map and allocation control
-/features/command-council        Multi-agent AI command council
-/features/simulation             Six-hour disaster simulation
-/features/counterfactuals        Counterfactual explanation lab
-/features/optimizer              Resource reallocation optimizer
-/features/citizen-reports        Citizen report intelligence
-/features/cascade-graph          Cascading risk graph
-/features/evacuation             Shelter evacuation engine
-/features/command-report         Downloadable command report
-```
-
-## Deploy on Render
-
-1. Push this folder to a public GitHub repository.
-2. In Render, create a new Web Service from the repository.
-3. Render can read `render.yaml`, or use:
-
-```text
-Build Command: npm install
-Start Command: npm start
-```
-
-No environment variables are required for the MVP.
-
-## Optional API Keys
-
-The current project does not require keys. If you later add OpenAQ, Mapbox, OpenRouteService, Twilio, or another provider, store secrets in Render environment variables and do not commit them:
-
-```text
-OPENAQ_API_KEY=...
-MAPBOX_API_KEY=...
-```
-
-## Feasibility
-
-MVP feasibility is high because it uses bundled sample zone data and no-key public APIs. The advanced real-world version needs official local datasets such as road blockages, hospital capacity, relief inventory, and verified population vulnerability data.
+MIT — Free for personal, educational, and hackathon use.

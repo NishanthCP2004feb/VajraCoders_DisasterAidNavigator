@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SOS Beacon — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/shared.css" />
+  <style>
+    .sos-layout{display:grid;grid-template-columns:400px 1fr;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
+    .sos-form-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow-y:auto;box-shadow:var(--shadow)}
+    .sos-form-header{padding:16px 18px;border-bottom:1px solid var(--border);text-align:center}
+    .sos-title{font-size:1.5rem;font-weight:800;color:#dc2626;margin-bottom:4px}
+    .sos-subtitle{font-size:0.78rem;color:var(--text-secondary)}
+    .sos-form{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+    .form-group{display:flex;flex-direction:column;gap:4px}
+    .form-label{font-size:0.75rem;font-weight:600;color:var(--text-secondary)}
+    .form-input,.form-select,.form-textarea{border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:0.85rem;font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);outline:none;transition:border-color 0.2s}
+    .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+    .form-textarea{resize:vertical;min-height:60px}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btn-detect{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:0.78rem;cursor:pointer;color:var(--text-secondary);transition:all 0.2s}
+    .btn-detect:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-sos{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:0.5px}
+    .btn-sos:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(220,38,38,0.35)}
+    .btn-sos:active{transform:translateY(0)}
+    .urgency-options{display:flex;gap:8px}
+    .urgency-opt{flex:1;text-align:center;padding:8px;border:2px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.75rem;font-weight:600;transition:all 0.2s}
+    .urgency-opt:hover{border-color:var(--border-bright)}
+    .urgency-opt.selected{border-color:currentColor;background:currentColor;color:#fff}
+    .urgency-opt[data-v="critical"]{color:#dc2626}
+    .urgency-opt[data-v="critical"].selected{background:rgba(220,38,38,0.1);color:#dc2626}
+    .urgency-opt[data-v="high"]{color:#ea580c}
+    .urgency-opt[data-v="high"].selected{background:rgba(234,88,12,0.1);color:#ea580c}
+    .urgency-opt[data-v="medium"]{color:#ca8a04}
+    .urgency-opt[data-v="medium"].selected{background:rgba(202,138,4,0.1);color:#ca8a04}
+    .urgency-opt[data-v="low"]{color:#16a34a}
+    .urgency-opt[data-v="low"].selected{background:rgba(22,163,74,0.1);color:#16a34a}
+    .sos-map-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+    #sos-map{flex:1;min-height:300px}
+    .beacon-list{max-height:200px;overflow-y:auto;border-top:1px solid var(--border)}
+    .beacon-item{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:0.78rem;animation:msg-in 0.3s ease}
+    @keyframes msg-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .beacon-pulse{width:10px;height:10px;border-radius:50%;flex-shrink:0;animation:pulse 1.5s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.3)}}
+    .beacon-info{flex:1}
+    .beacon-name{font-weight:600;color:var(--text-primary)}
+    .beacon-detail{font-size:0.7rem;color:var(--text-muted)}
+    .beacon-time{font-size:0.68rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+    .beacon-status{padding:2px 6px;border-radius:4px;font-size:0.62rem;font-weight:600;text-transform:uppercase}
+    .status-active{background:rgba(220,38,38,0.1);color:#dc2626}
+    .status-acknowledged{background:rgba(37,99,235,0.1);color:#2563eb}
+    .status-rescued{background:rgba(22,163,74,0.1);color:#16a34a}
+    .success-msg{background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);color:#16a34a;padding:10px 14px;border-radius:8px;font-size:0.82rem;font-weight:600;text-align:center;animation:msg-in 0.3s ease}
+    @media(max-width:800px){.sos-layout{grid-template-columns:1fr;height:auto}.sos-map-panel{min-height:400px}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(220,38,38,0.08)">🆘</div>
+        <div><div class="nav-page-title">SOS Beacon System</div><div class="nav-page-sub">Crowdsourced Emergency Reports</div></div>
+      </div>
+    </div>
+    <div class="nav-right">
+      <div class="nav-live"><span class="dot"></span> LIVE</div>
+      <div class="nav-clock" id="clock">--:--</div>
+      <span class="badge badge-critical" id="beacon-count">0 Active Beacons</span>
+    </div>
+  </nav>
+
+  <div class="sos-layout">
+    <div class="sos-form-panel">
+      <div class="sos-form-header">
+        <div class="sos-title">🆘 Send SOS Beacon</div>
+        <div class="sos-subtitle">Submit your emergency location and details</div>
+      </div>
+      <form class="sos-form" id="sos-form">
+        <div class="form-group">
+          <label class="form-label">Your Name</label>
+          <input class="form-input" id="sos-name" placeholder="Enter your name" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Latitude</label>
+            <input class="form-input" id="sos-lat" type="number" step="any" placeholder="13.0827" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Longitude</label>
+            <input class="form-input" id="sos-lng" type="number" step="any" placeholder="80.2707" required />
+          </div>
+        </div>
+        <button type="button" class="btn-detect" id="btn-detect-loc">📍 Auto-Detect My Location</button>
+        <div class="form-group">
+          <label class="form-label">Number of People</label>
+          <input class="form-input" id="sos-people" type="number" min="1" value="1" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Urgency Level</label>
+          <div class="urgency-options" id="urgency-options">
+            <div class="urgency-opt" data-v="critical">🔴 Critical</div>
+            <div class="urgency-opt selected" data-v="high">🟠 High</div>
+            <div class="urgency-opt" data-v="medium">🟡 Medium</div>
+            <div class="urgency-opt" data-v="low">🟢 Low</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Emergency Type</label>
+          <select class="form-select" id="sos-type">
+            <option>Trapped under debris</option>
+            <option>Flood — need evacuation</option>
+            <option>Medical emergency</option>
+            <option>Stranded — no transport</option>
+            <option>Fire nearby</option>
+            <option>Need food & water</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Additional Details</label>
+          <textarea class="form-textarea" id="sos-details" placeholder="Describe your situation..."></textarea>
+        </div>
+        <button type="submit" class="btn-sos">🆘 SEND SOS BEACON</button>
+        <div id="sos-success" class="hidden"></div>
+      </form>
+    </div>
+
+    <div class="sos-map-panel">
+      <div class="card-header">🗺️ Active SOS Beacons — Live Map</div>
+      <div id="sos-map"></div>
+      <div class="beacon-list" id="beacon-list"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false}); }, 1000);
+
+    const map = L.map('sos-map', { center: [13.08, 80.27], zoom: 11 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+    const beaconLayer = L.layerGroup().addTo(map);
+    const beacons = [];
+
+    const URGENCY_COLORS = { critical:'#dc2626', high:'#ea580c', medium:'#ca8a04', low:'#16a34a' };
+    let selectedUrgency = 'high';
+
+    // Urgency selector
+    document.getElementById('urgency-options').addEventListener('click', e => {
+      const opt = e.target.closest('.urgency-opt');
+      if (!opt) return;
+      document.querySelectorAll('.urgency-opt').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      selectedUrgency = opt.dataset.v;
+    });
+
+    // Auto-detect location
+    document.getElementById('btn-detect-loc').addEventListener('click', () => {
+      if (!navigator.geolocation) return alert('Geolocation not supported');
+      navigator.geolocation.getCurrentPosition(pos => {
+        document.getElementById('sos-lat').value = pos.coords.latitude.toFixed(6);
+        document.getElementById('sos-lng').value = pos.coords.longitude.toFixed(6);
+      }, () => alert('Location access denied'));
+    });
+
+    // Submit SOS
+    document.getElementById('sos-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const beacon = {
+        id: 'SOS-' + String(beacons.length + 1).padStart(3, '0'),
+        name: document.getElementById('sos-name').value,
+        lat: parseFloat(document.getElementById('sos-lat').value),
+        lng: parseFloat(document.getElementById('sos-lng').value),
+        people: parseInt(document.getElementById('sos-people').value),
+        urgency: selectedUrgency,
+        type: document.getElementById('sos-type').value,
+        details: document.getElementById('sos-details').value,
+        time: new Date(),
+        status: 'active'
+      };
+      addBeacon(beacon);
+      const suc = document.getElementById('sos-success');
+      suc.className = 'success-msg';
+      suc.textContent = `✅ SOS Beacon ${beacon.id} transmitted! Help is on the way.`;
+      setTimeout(() => suc.className = 'hidden', 4000);
+    });
+
+    function addBeacon(b) {
+      beacons.unshift(b);
+      const color = URGENCY_COLORS[b.urgency];
+      const svgIcon = L.divIcon({
+        html: `<svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="${color}" opacity="0.15"><animate attributeName="r" values="12;18;12" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0.08;0.3" dur="1.5s" repeatCount="indefinite"/></circle><circle cx="18" cy="18" r="8" fill="${color}" opacity="0.7"/><circle cx="18" cy="18" r="4" fill="#fff"/></svg>`,
+        className: 'custom-marker', iconSize: [36,36], iconAnchor: [18,18]
+      });
+      L.marker([b.lat, b.lng], { icon: svgIcon }).addTo(beaconLayer)
+        .bindPopup(`<b style="color:${color}">🆘 ${b.id}</b><br>${b.name} — ${b.people} people<br><small>${b.type}</small>`);
+      map.setView([b.lat, b.lng], 13);
+      renderBeaconList();
+      document.getElementById('beacon-count').textContent = beacons.filter(x=>x.status==='active').length + ' Active Beacons';
+    }
+
+    function renderBeaconList() {
+      const list = document.getElementById('beacon-list');
+      list.innerHTML = beacons.map(b => {
+        const color = URGENCY_COLORS[b.urgency];
+        const statusClass = 'status-' + b.status;
+        return `<div class="beacon-item"><div class="beacon-pulse" style="background:${color}"></div><div class="beacon-info"><div class="beacon-name">${b.id} — ${b.name}</div><div class="beacon-detail">${b.people} people · ${b.type}</div></div><span class="beacon-status ${statusClass}">${b.status}</span><span class="beacon-time">${b.time.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'})}</span></div>`;
+      }).join('');
+    }
+
+    // Pre-populate demo beacons
+    const demoBeacons = [
+      { id:'SOS-D01', name:'Rajesh Kumar', lat:13.09, lng:80.28, people:5, urgency:'critical', type:'Trapped under debris', details:'Building collapsed', time:new Date(Date.now()-300000), status:'active' },
+      { id:'SOS-D02', name:'Priya Nair', lat:13.06, lng:80.25, people:12, urgency:'high', type:'Flood — need evacuation', details:'Water rising in basement', time:new Date(Date.now()-180000), status:'acknowledged' },
+      { id:'SOS-D03', name:'Arun Sharma', lat:13.15, lng:80.31, people:3, urgency:'medium', type:'Medical emergency', details:'Elderly person needs medication', time:new Date(Date.now()-60000), status:'active' }
+    ];
+    demoBeacons.forEach(addBeacon);
+  </script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Disaster Scenarios — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .sc-layout{display:grid;grid-template-columns:320px 1fr;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
+    .sc-panel{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .sc-card{background:var(--bg-card);border:2px solid var(--border);border-radius:var(--radius-lg);padding:16px;cursor:pointer;transition:all 0.25s;box-shadow:var(--shadow)}
+    .sc-card:hover{border-color:var(--border-bright);transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+    .sc-card.active{border-color:var(--sc-color,var(--accent));box-shadow:0 4px 20px var(--sc-glow,rgba(37,99,235,0.15))}
+    .sc-icon{font-size:2rem;margin-bottom:8px}
+    .sc-name{font-size:1rem;font-weight:700;margin-bottom:4px}
+    .sc-desc{font-size:0.75rem;color:var(--text-secondary);line-height:1.5;margin-bottom:8px}
+    .sc-tags{display:flex;gap:5px;flex-wrap:wrap}
+    .sc-tag{background:var(--bg-primary);border:1px solid var(--border);padding:2px 7px;border-radius:4px;font-size:0.65rem;color:var(--text-muted);font-weight:500}
+    .sc-map-panel{display:flex;flex-direction:column;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    #sc-map{flex:1;min-height:300px}
+    .sc-timeline{border-top:1px solid var(--border);max-height:200px;overflow-y:auto}
+    .tl-item{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:0.78rem;animation:msg-in 0.3s ease}
+    @keyframes msg-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .tl-time{font-family:'JetBrains Mono',monospace;color:var(--text-muted);font-size:0.7rem;width:50px;flex-shrink:0}
+    .tl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .tl-text{color:var(--text-secondary);flex:1}
+    .sc-status-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-primary)}
+    .sc-status-bar .badge{font-size:0.7rem}
+    .sc-progress{flex:1;background:var(--border);border-radius:4px;height:5px;overflow:hidden}
+    .sc-progress-fill{height:100%;border-radius:4px;transition:width 0.5s}
+    .btn-run-sc{padding:6px 14px;font-size:0.78rem}
+    @media(max-width:800px){.sc-layout{grid-template-columns:1fr;height:auto}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(8,145,178,0.08)">🌊</div>
+        <div><div class="nav-page-title">Disaster Scenarios</div><div class="nav-page-sub">Multi-Type Simulation Engine</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="sc-layout">
+    <div class="sc-panel">
+      <div class="section-title">Select Disaster Type</div>
+      <div class="sc-card active" data-sc="hurricane" style="--sc-color:#2563eb;--sc-glow:rgba(37,99,235,0.15)">
+        <div class="sc-icon">🌀</div>
+        <div class="sc-name">Hurricane Atlas</div>
+        <div class="sc-desc">Category 3 hurricane with storm surge, flooding, and infrastructure damage. Wind speeds up to 180 km/h.</div>
+        <div class="sc-tags"><span class="sc-tag">Wind Damage</span><span class="sc-tag">Storm Surge</span><span class="sc-tag">Flooding</span></div>
+      </div>
+      <div class="sc-card" data-sc="flood" style="--sc-color:#0891b2;--sc-glow:rgba(8,145,178,0.15)">
+        <div class="sc-icon">🌊</div>
+        <div class="sc-name">Monsoon Floods</div>
+        <div class="sc-desc">Sustained heavy rainfall causing river overflow, urban flooding, and water contamination across low-lying zones.</div>
+        <div class="sc-tags"><span class="sc-tag">Water Rising</span><span class="sc-tag">Contamination</span><span class="sc-tag">Boat Rescue</span></div>
+      </div>
+      <div class="sc-card" data-sc="earthquake" style="--sc-color:#dc2626;--sc-glow:rgba(220,38,38,0.15)">
+        <div class="sc-icon">🫨</div>
+        <div class="sc-name">Earthquake 6.5M</div>
+        <div class="sc-desc">Magnitude 6.5 earthquake with multiple aftershocks. Building collapses, gas leaks, and infrastructure failure.</div>
+        <div class="sc-tags"><span class="sc-tag">Aftershocks</span><span class="sc-tag">Collapse</span><span class="sc-tag">Gas Leaks</span></div>
+      </div>
+      <div class="sc-card" data-sc="wildfire" style="--sc-color:#ea580c;--sc-glow:rgba(234,88,12,0.15)">
+        <div class="sc-icon">🔥</div>
+        <div class="sc-name">Urban Wildfire</div>
+        <div class="sc-desc">Wildfire spreading from forest into urban areas. Wind-driven fire spread, air quality emergency, mass evacuation.</div>
+        <div class="sc-tags"><span class="sc-tag">Fire Spread</span><span class="sc-tag">Air Quality</span><span class="sc-tag">Evacuation</span></div>
+      </div>
+    </div>
+
+    <div class="sc-map-panel">
+      <div class="card-header" id="sc-header">🌀 Hurricane Atlas — Simulation</div>
+      <div id="sc-map"></div>
+      <div class="sc-status-bar">
+        <span class="badge badge-critical" id="sc-badge">Ready</span>
+        <div class="sc-progress"><div class="sc-progress-fill" id="sc-progress" style="width:0%;background:#2563eb"></div></div>
+        <span style="font-size:0.72rem;color:var(--text-muted)" id="sc-step-label">—</span>
+        <button class="btn-primary btn-run-sc" id="btn-run">▶ Run Scenario</button>
+      </div>
+      <div class="sc-timeline" id="sc-timeline"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const map = L.map('sc-map',{center:[13.08,80.27],zoom:11});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+    const overlayLayer = L.layerGroup().addTo(map);
+
+    const SCENARIOS = {
+      hurricane: {
+        name:'Hurricane Atlas', icon:'🌀', color:'#2563eb',
+        overlayColor:'rgba(37,99,235,0.15)', overlayBorder:'#2563eb',
+        steps: [
+          {time:'T+0:00',text:'Hurricane warning issued — Category 3 approaching coast',color:'red',effect:'warning'},
+          {time:'T+0:30',text:'Wind speed 150 km/h — first structural damage reported',color:'orange',effect:'wind'},
+          {time:'T+1:00',text:'Storm surge hits Riverside Delta — severe flooding begins',color:'red',effect:'flood'},
+          {time:'T+1:30',text:'Building collapse at Old Fisherman Port — 20+ trapped',color:'red',effect:'collapse'},
+          {time:'T+2:00',text:'3 major roads completely blocked by debris',color:'orange',effect:'roads'},
+          {time:'T+2:30',text:'All shelters at 85% capacity — overflow crisis',color:'yellow',effect:'shelter'},
+          {time:'T+3:00',text:'Hurricane eye passing — temporary calm, preparing Phase 2',color:'blue',effect:'calm'},
+          {time:'T+3:30',text:'Second wave hits — fresh damage to weakened structures',color:'red',effect:'wave2'},
+          {time:'T+4:00',text:'Storm weakening — recovery operations begin',color:'green',effect:'recovery'}
+        ]
+      },
+      flood: {
+        name:'Monsoon Floods', icon:'🌊', color:'#0891b2',
+        overlayColor:'rgba(8,145,178,0.2)', overlayBorder:'#0891b2',
+        steps: [
+          {time:'T+0:00',text:'Heavy rainfall warning — 200mm expected in 6 hours',color:'yellow',effect:'warning'},
+          {time:'T+0:30',text:'River levels rising rapidly — low-lying areas on alert',color:'orange',effect:'rising'},
+          {time:'T+1:00',text:'Riverside Delta underwater — evacuation orders issued',color:'red',effect:'flood'},
+          {time:'T+1:30',text:'Water contamination detected — boil water advisory',color:'red',effect:'contamination'},
+          {time:'T+2:00',text:'Boat rescue teams deployed to isolated communities',color:'blue',effect:'rescue'},
+          {time:'T+2:30',text:'Northern Farmlands cut off — helicopter access only',color:'red',effect:'isolated'},
+          {time:'T+3:00',text:'Rainfall subsiding — water levels stabilizing',color:'green',effect:'stable'}
+        ]
+      },
+      earthquake: {
+        name:'Earthquake 6.5M', icon:'🫨', color:'#dc2626',
+        overlayColor:'rgba(220,38,38,0.12)', overlayBorder:'#dc2626',
+        steps: [
+          {time:'T+0:00',text:'⚡ EARTHQUAKE M6.5 — Epicenter 15km east of city center',color:'red',effect:'quake'},
+          {time:'T+0:05',text:'Multiple building collapses reported across 4 districts',color:'red',effect:'collapse'},
+          {time:'T+0:15',text:'Gas leak detected at Industrial Docklands — evacuation',color:'orange',effect:'gas'},
+          {time:'T+0:30',text:'Aftershock M4.2 — additional structural damage',color:'red',effect:'aftershock'},
+          {time:'T+1:00',text:'Search & rescue operations underway at 6 sites',color:'blue',effect:'rescue'},
+          {time:'T+1:30',text:'Tsunami advisory issued for coastal zones (precautionary)',color:'yellow',effect:'tsunami'},
+          {time:'T+2:00',text:'All-clear for tsunami — continuing rescue operations',color:'green',effect:'clear'}
+        ]
+      },
+      wildfire: {
+        name:'Urban Wildfire', icon:'🔥', color:'#ea580c',
+        overlayColor:'rgba(234,88,12,0.15)', overlayBorder:'#ea580c',
+        steps: [
+          {time:'T+0:00',text:'Wildfire detected at forest boundary — wind 40 km/h NE',color:'red',effect:'fire'},
+          {time:'T+0:30',text:'Fire spreading towards Tech Park Suburb — evacuate now',color:'red',effect:'spread'},
+          {time:'T+1:00',text:'Air quality index reaches HAZARDOUS — masks mandatory',color:'orange',effect:'air'},
+          {time:'T+1:30',text:'Firebreak established at Highway 9 — holding position',color:'blue',effect:'firebreak'},
+          {time:'T+2:00',text:'Fire jumps firebreak at northern sector — new front',color:'red',effect:'jump'},
+          {time:'T+2:30',text:'Aerial water bombers deployed — 3 aircraft on scene',color:'blue',effect:'aerial'},
+          {time:'T+3:00',text:'Fire 60% contained — wind dying down',color:'green',effect:'contained'}
+        ]
+      }
+    };
+
+    let activeSc = 'hurricane';
+    let running = false;
+    let stepIdx = 0;
+    let timer = null;
+
+    // Zone markers
+    async function loadZones() {
+      try {
+        const data = await (await fetch('/api/zones')).json();
+        data.zones.forEach(z => {
+          const sev = z.severity>=8?'#dc2626':z.severity>=6?'#ea580c':z.severity>=4?'#ca8a04':'#16a34a';
+          L.circleMarker([z.latitude,z.longitude],{radius:7,fillColor:sev,color:sev,weight:2,fillOpacity:0.3}).addTo(map).bindPopup(`<b>${z.name}</b><br>Severity: ${z.severity}/10`);
+        });
+      } catch(e) {}
+    }
+    loadZones();
+
+    // Card selection
+    document.querySelectorAll('.sc-card').forEach(card => {
+      card.addEventListener('click', () => {
+        if (running) return;
+        document.querySelectorAll('.sc-card').forEach(c=>c.classList.remove('active'));
+        card.classList.add('active');
+        activeSc = card.dataset.sc;
+        const sc = SCENARIOS[activeSc];
+        document.getElementById('sc-header').textContent = sc.icon + ' ' + sc.name + ' — Simulation';
+        document.getElementById('sc-progress').style.background = sc.color;
+        document.getElementById('sc-progress').style.width = '0%';
+        document.getElementById('sc-badge').textContent = 'Ready';
+        document.getElementById('sc-step-label').textContent = '—';
+        document.getElementById('sc-timeline').innerHTML = '';
+        overlayLayer.clearLayers();
+      });
+    });
+
+    // Run scenario
+    document.getElementById('btn-run').addEventListener('click', () => {
+      if (running) { stopScenario(); return; }
+      running = true; stepIdx = 0;
+      document.getElementById('btn-run').textContent = '⏸ Stop';
+      document.getElementById('sc-badge').textContent = 'Running';
+      document.getElementById('sc-badge').className = 'badge badge-critical';
+      document.getElementById('sc-timeline').innerHTML = '';
+      overlayLayer.clearLayers();
+      runStep();
+    });
+
+    function runStep() {
+      const sc = SCENARIOS[activeSc];
+      if (!running || stepIdx >= sc.steps.length) { stopScenario(); return; }
+      const step = sc.steps[stepIdx];
+      document.getElementById('sc-progress').style.width = ((stepIdx+1)/sc.steps.length*100)+'%';
+      document.getElementById('sc-step-label').textContent = step.time;
+      // Add timeline entry
+      const tl = document.getElementById('sc-timeline');
+      const item = document.createElement('div');
+      item.className = 'tl-item';
+      item.innerHTML = `<span class="tl-time">${step.time}</span><span class="tl-dot" style="background:${step.color==='red'?'#dc2626':step.color==='orange'?'#ea580c':step.color==='yellow'?'#ca8a04':step.color==='blue'?'#2563eb':'#16a34a'}"></span><span class="tl-text">${step.text}</span>`;
+      tl.insertBefore(item, tl.firstChild);
+      // Add map effect
+      applyEffect(step, sc);
+      stepIdx++;
+      timer = setTimeout(runStep, 3000);
+    }
+
+    function applyEffect(step, sc) {
+      const centers = [[13.08,80.27],[13.095,80.34],[13.15,80.31],[13.03,80.22],[13.07,80.265]];
+      const center = centers[stepIdx % centers.length];
+      L.circle(center, { radius: 2000 + stepIdx*500, fillColor: sc.overlayColor, color: sc.overlayBorder, weight:1, fillOpacity:0.2+stepIdx*0.03 }).addTo(overlayLayer);
+    }
+
+    function stopScenario() {
+      running = false;
+      clearTimeout(timer);
+      document.getElementById('btn-run').textContent = '▶ Run Scenario';
+      document.getElementById('sc-badge').textContent = 'Complete';
+      document.getElementById('sc-badge').className = 'badge badge-low';
+    }
+  </script>
+</body>
+</html>

@@ -1,39 +1,265 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>DisasterAid Navigator</title>
-    <link rel="preconnect" href="https://unpkg.com">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="/styles.css">
-  </head>
-  <body>
-    <header class="app-header">
-      <a class="brand-link" href="/" data-route>
-        <span class="brand-mark"><i data-lucide="shield-alert"></i></span>
-        <span>
-          <small>Emergency command center</small>
-          <strong>DisasterAid Navigator</strong>
-        </span>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CrisisIQ — Disaster Response Command Platform</title>
+  <meta name="description" content="AI-powered disaster response platform with real-time coordination, SOS beacons, convoy tracking, and analytics." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/shared.css" />
+  <style>
+    .dashboard-hero {
+      text-align: center;
+      padding: 48px 20px 24px;
+    }
+    .hero-logo {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, #dc2626, #ea580c);
+      border-radius: 20px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #fff; margin-bottom: 16px;
+      box-shadow: 0 8px 32px rgba(220,38,38,0.25);
+      position: relative;
+    }
+    .hero-logo::after {
+      content: ''; position: absolute; inset: -4px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #dc2626, #ea580c);
+      opacity: 0.2; z-index: -1;
+      animation: hero-pulse 2.5s ease-in-out infinite;
+    }
+    @keyframes hero-pulse {
+      0%,100% { transform: scale(1); opacity: 0.2; }
+      50% { transform: scale(1.15); opacity: 0.08; }
+    }
+    .hero-title {
+      font-size: 2.2rem; font-weight: 900;
+      background: linear-gradient(90deg, #dc2626, #ea580c, #ca8a04);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; letter-spacing: -1px; margin-bottom: 6px;
+    }
+    .hero-sub {
+      font-size: 0.95rem; color: var(--text-secondary);
+      max-width: 520px; margin: 0 auto; line-height: 1.5;
+    }
+    .status-bar {
+      display: flex; justify-content: center; gap: 20px;
+      margin-top: 18px; flex-wrap: wrap;
+    }
+    .status-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      padding: 6px 14px; border-radius: 20px; font-size: 0.78rem;
+      color: var(--text-secondary); font-weight: 500;
+    }
+    .status-chip .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .dot-green { background: #16a34a; box-shadow: 0 0 6px rgba(22,163,74,0.5); }
+    .dot-red { background: #dc2626; animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+    /* Feature Grid */
+    .features-section {
+      max-width: 1100px; margin: 0 auto;
+      padding: 10px 20px 40px;
+    }
+    .section-label {
+      font-size: 0.72rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 1.2px;
+      margin-bottom: 14px; padding-left: 4px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 20px;
+      text-decoration: none;
+      color: var(--text-primary);
+      transition: all 0.25s ease;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card:hover {
+      border-color: var(--border-bright);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      transform: translateY(-3px);
+    }
+    .feature-card:active { transform: translateY(-1px); }
+    .feature-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 3px; border-radius: 14px 14px 0 0;
+      background: var(--card-accent, #2563eb);
+      opacity: 0; transition: opacity 0.25s;
+    }
+    .feature-card:hover::before { opacity: 1; }
+    .card-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; margin-bottom: 14px;
+      background: var(--icon-bg, rgba(37,99,235,0.08));
+    }
+    .card-title {
+      font-size: 1rem; font-weight: 700; margin-bottom: 5px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-desc {
+      font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5;
+    }
+    .card-tag {
+      display: inline-block; margin-top: 10px;
+      padding: 2px 8px; border-radius: 6px;
+      font-size: 0.65rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .tag-core { background: rgba(37,99,235,0.08); color: #2563eb; }
+    .tag-ai { background: rgba(124,58,237,0.08); color: #7c3aed; }
+    .tag-live { background: rgba(22,163,74,0.08); color: #16a34a; }
+    .tag-data { background: rgba(234,88,12,0.08); color: #ea580c; }
+
+    .card-arrow {
+      position: absolute; top: 20px; right: 18px;
+      color: var(--text-muted); font-size: 1rem;
+      transition: all 0.25s;
+    }
+    .feature-card:hover .card-arrow {
+      color: var(--text-primary); transform: translateX(3px);
+    }
+
+    /* Footer */
+    .dash-footer {
+      text-align: center; padding: 20px;
+      font-size: 0.72rem; color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+    .dash-footer a { color: var(--accent); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .hero-title { font-size: 1.6rem; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Hero Section -->
+  <div class="dashboard-hero">
+    <div class="hero-logo">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <polygon points="12,2 22,20 2,20"/>
+        <line x1="12" y1="8" x2="12" y2="13"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </div>
+    <h1 class="hero-title">CrisisIQ</h1>
+    <p class="hero-sub">AI-Powered Real-Time Disaster Response Platform — Intelligent coordination, resource allocation, and life-saving decisions.</p>
+    <div class="status-bar">
+      <div class="status-chip"><span class="dot dot-green"></span> All Systems Operational</div>
+      <div class="status-chip"><span class="dot dot-red"></span> <span id="active-zones">8</span> Active Zones</div>
+      <div class="status-chip">🕐 <span id="dash-clock">--:--</span></div>
+    </div>
+  </div>
+
+  <!-- Core Features -->
+  <div class="features-section">
+    <div class="section-label">🎯 Core Operations</div>
+    <div class="feature-grid">
+
+      <a class="feature-card" href="command-center.html" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🗺️</div>
+        <div class="card-title">Command Center</div>
+        <div class="card-desc">Live disaster map with priority scoring, resource allocation engine, and real-time zone monitoring.</div>
+        <span class="card-tag tag-core">Core Dashboard</span>
       </a>
-      <nav class="top-nav" aria-label="Primary navigation">
-        <a href="/" data-route>Dashboard</a>
-        <a href="/features/operations" data-route>Operations</a>
-        <a href="/features/command-report" data-route>Report</a>
-      </nav>
-      <div class="header-actions">
-        <span id="dataStatus" class="status-pill">Loading intelligence</span>
-        <button id="refreshBtn" class="icon-button" type="button" title="Refresh plan" aria-label="Refresh plan">
-          <i data-lucide="refresh-cw"></i>
-        </button>
-      </div>
-    </header>
 
-    <main id="pageRoot" class="app-shell" tabindex="-1"></main>
+      <a class="feature-card" href="ai-chat.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🤖</div>
+        <div class="card-title">AI Command Chat</div>
+        <div class="card-desc">Natural language interface — ask questions, issue commands, and get intelligent AI-driven disaster insights.</div>
+        <span class="card-tag tag-ai">AI Powered</span>
+      </a>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="/app.js"></script>
-  </body>
+      <a class="feature-card" href="sos.html" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🆘</div>
+        <div class="card-title">SOS Beacon</div>
+        <div class="card-desc">Crowdsourced emergency beacon — victims submit location, headcount, and urgency from their phones.</div>
+        <span class="card-tag tag-live">Live System</span>
+      </a>
+
+      <a class="feature-card" href="convoys.html" style="--card-accent:#ea580c; --icon-bg:rgba(234,88,12,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🚛</div>
+        <div class="card-title">Convoy Tracker</div>
+        <div class="card-desc">Track resource convoys moving from hub to disaster zones with animated routes, ETA, and cargo details.</div>
+        <span class="card-tag tag-live">Real-Time</span>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- Intelligence Features -->
+  <div class="features-section">
+    <div class="section-label">📡 Intelligence & Analysis</div>
+    <div class="feature-grid">
+
+      <a class="feature-card" href="analytics.html" style="--card-accent:#2563eb; --icon-bg:rgba(37,99,235,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">📊</div>
+        <div class="card-title">Analytics Dashboard</div>
+        <div class="card-desc">Charts, severity distribution, resource gap analysis, coverage metrics, and response efficiency scores.</div>
+        <span class="card-tag tag-data">Data Insights</span>
+      </a>
+
+      <a class="feature-card" href="scenarios.html" style="--card-accent:#0891b2; --icon-bg:rgba(8,145,178,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🌊</div>
+        <div class="card-title">Disaster Scenarios</div>
+        <div class="card-desc">Simulate hurricanes, floods, wildfires, and earthquakes — each with unique behavior and priority adjustments.</div>
+        <span class="card-tag tag-ai">Simulation Engine</span>
+      </a>
+
+      <a class="feature-card" href="social-monitor.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">📱</div>
+        <div class="card-title">Social Media Monitor</div>
+        <div class="card-desc">AI-powered sentiment analysis of simulated social posts — tracks public panic level per zone in real-time.</div>
+        <span class="card-tag tag-ai">NLP Analysis</span>
+      </a>
+
+      <a class="feature-card" href="reports.html" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">📄</div>
+        <div class="card-title">Report Generator</div>
+        <div class="card-desc">One-click professional PDF incident reports with maps, allocation tables, AI explanations, and timestamps.</div>
+        <span class="card-tag tag-core">Export</span>
+      </a>
+
+    </div>
+  </div>
+
+  <footer class="dash-footer">
+    CrisisIQ v2.0 — Real-Time Disaster Response Platform · 
+    <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> · 
+    <a href="https://earthquake.usgs.gov" target="_blank">USGS</a> · 
+    <a href="https://openstreetmap.org" target="_blank">OpenStreetMap</a>
+  </footer>
+
+  <script>
+    function tick() {
+      document.getElementById('dash-clock').textContent =
+        new Date().toLocaleTimeString('en-US', { hour12: false });
+    }
+    setInterval(tick, 1000); tick();
+  </script>
+</body>
 </html>

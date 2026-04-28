@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Report Generator — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .rpt-layout{display:grid;grid-template-columns:280px 1fr;gap:14px;padding:14px 20px;min-height:calc(100vh - 54px)}
+    .rpt-controls{display:flex;flex-direction:column;gap:10px}
+    .rpt-btn-group{display:flex;flex-direction:column;gap:8px;padding:14px}
+    .rpt-btn{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;font-size:0.78rem;color:var(--text-secondary);cursor:pointer;transition:all 0.2s;font-family:'Inter',sans-serif}
+    .rpt-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+    .rpt-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-glow);font-weight:600}
+    .rpt-preview{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+    .rpt-toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg-primary)}
+    .rpt-toolbar-left{display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text-secondary);font-weight:600}
+    .rpt-doc{flex:1;overflow-y:auto;padding:32px 40px;font-size:0.85rem;line-height:1.7;color:var(--text-primary)}
+    .rpt-doc h2{font-size:1.3rem;font-weight:800;margin:0 0 4px;color:var(--text-primary);border-bottom:2px solid var(--border);padding-bottom:8px}
+    .rpt-doc h3{font-size:1rem;font-weight:700;margin:18px 0 6px;color:var(--text-primary)}
+    .rpt-doc .rpt-meta{font-size:0.75rem;color:var(--text-muted);margin-bottom:16px}
+    .rpt-doc table{width:100%;border-collapse:collapse;margin:10px 0;font-size:0.78rem}
+    .rpt-doc th{background:var(--bg-primary);padding:8px 10px;text-align:left;font-size:0.7rem;text-transform:uppercase;color:var(--text-muted);border-bottom:2px solid var(--border)}
+    .rpt-doc td{padding:8px 10px;border-bottom:1px solid var(--border)}
+    .rpt-doc .rpt-highlight{background:rgba(37,99,235,0.05);border-left:3px solid #2563eb;padding:10px 14px;border-radius:0 6px 6px 0;margin:10px 0;font-size:0.82rem}
+    .rpt-doc .rpt-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+    .rpt-doc .rpt-stat{background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+    .rpt-doc .rpt-stat-val{font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .rpt-doc .rpt-stat-key{font-size:0.68rem;color:var(--text-muted);margin-top:2px}
+    .rpt-doc .rpt-footer{margin-top:24px;padding-top:12px;border-top:1px solid var(--border);font-size:0.72rem;color:var(--text-muted);text-align:center}
+    .rpt-doc .stamp{display:inline-block;border:2px solid #dc2626;color:#dc2626;padding:4px 12px;border-radius:4px;font-weight:700;font-size:0.9rem;transform:rotate(-5deg);margin:10px 0}
+    @media(max-width:800px){.rpt-layout{grid-template-columns:1fr}.rpt-doc{padding:16px}}
+    @media print{.top-nav,.rpt-controls,.rpt-toolbar{display:none!important}.rpt-layout{display:block}.rpt-preview{border:none;box-shadow:none}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(22,163,74,0.08)">📄</div>
+        <div><div class="nav-page-title">Report Generator</div><div class="nav-page-sub">Professional Incident Reports</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="rpt-layout">
+    <div class="rpt-controls">
+      <div class="card">
+        <div class="card-header">📋 Report Type</div>
+        <div class="rpt-btn-group">
+          <button class="rpt-btn active" data-type="full">📊 Full Incident Report</button>
+          <button class="rpt-btn" data-type="executive">📝 Executive Summary</button>
+          <button class="rpt-btn" data-type="resource">📦 Resource Report</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">⚙️ Actions</div>
+        <div class="rpt-btn-group">
+          <button class="rpt-btn" id="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+          <button class="rpt-btn" id="btn-json">💾 Export JSON</button>
+          <button class="rpt-btn" id="btn-refresh">🔄 Refresh Data</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rpt-preview">
+      <div class="rpt-toolbar">
+        <div class="rpt-toolbar-left">📄 Report Preview</div>
+        <span style="font-size:0.7rem;color:var(--text-muted)" id="rpt-time">—</span>
+      </div>
+      <div class="rpt-doc" id="rpt-doc">Loading report data...</div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    let plan = null;
+    let reportType = 'full';
+
+    document.querySelectorAll('.rpt-btn[data-type]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.rpt-btn[data-type]').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        reportType = btn.dataset.type;
+        renderReport();
+      });
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click', loadAndRender);
+    document.getElementById('btn-json').addEventListener('click', () => {
+      if (!plan) return;
+      const blob = new Blob([JSON.stringify(plan,null,2)],{type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'crisisiq-report-'+new Date().toISOString().slice(0,10)+'.json';
+      a.click();
+    });
+
+    async function loadAndRender() {
+      try { plan = await (await fetch('/api/plan')).json(); } catch(e) { return; }
+      document.getElementById('rpt-time').textContent = 'Generated: ' + new Date().toLocaleString();
+      renderReport();
+    }
+    loadAndRender();
+
+    function renderReport() {
+      if (!plan) return;
+      const doc = document.getElementById('rpt-doc');
+      const zones = plan.rankedZones || [];
+      const now = new Date().toLocaleString();
+      const reportId = 'RPT-' + Date.now().toString(36).toUpperCase();
+
+      if (reportType === 'executive') { doc.innerHTML = renderExecutive(zones, now, reportId); return; }
+      if (reportType === 'resource') { doc.innerHTML = renderResource(zones, now, reportId); return; }
+      doc.innerHTML = renderFull(zones, now, reportId);
+    }
+
+    function renderFull(zones, now, id) {
+      const total = plan.totalAffectedPopulation;
+      const crit = plan.criticalZoneCount;
+      const vuln = zones.reduce((s,rz)=>s+rz.zone.vulnerablePeople,0);
+      return `
+        <h2>🚨 CrisisIQ — Incident Report</h2>
+        <div class="rpt-meta">Report ID: <strong>${id}</strong> · Generated: ${now} · Classification: <span class="stamp">URGENT</span></div>
+        <h3>1. Situation Overview</h3>
+        <div class="rpt-stat-grid">
+          <div class="rpt-stat"><div class="rpt-stat-val" style="color:#dc2626">${total?.toLocaleString()}</div><div class="rpt-stat-key">Total Affected</div></div>
+          <div class="rpt-stat"><div class="rpt-stat-val" style="color:#ea580c">${crit}</div><div class="rpt-stat-key">Critical Zones</div></div>
+          <div class="rpt-stat"><div class="rpt-stat-val" style="color:#7c3aed">${vuln.toLocaleString()}</div><div class="rpt-stat-key">Vulnerable People</div></div>
+        </div>
+        <div class="rpt-highlight">🤖 <strong>AI Assessment:</strong> ${plan.decisionExplanation}</div>
+        <h3>2. Weather & Seismic Conditions</h3>
+        <table><tr><th>Parameter</th><th>Value</th><th>Source</th></tr>
+        <tr><td>Weather Status</td><td><strong>${plan.weatherData?.status}</strong></td><td>${plan.weatherData?.source}</td></tr>
+        <tr><td>Precipitation</td><td>${plan.weatherData?.precipitation} mm</td><td>—</td></tr>
+        <tr><td>Wind Speed</td><td>${plan.weatherData?.windspeed} km/h</td><td>—</td></tr>
+        <tr><td>Seismic Events (24h)</td><td><strong>${plan.earthquakeData?.count}</strong></td><td>${plan.earthquakeData?.source}</td></tr></table>
+        <h3>3. Zone Priority Ranking</h3>
+        <table><tr><th>#</th><th>Zone</th><th>Priority</th><th>Score</th><th>Population</th><th>Severity</th><th>Access</th></tr>
+        ${zones.map((rz,i)=>`<tr><td><strong>${i+1}</strong></td><td>${rz.zone.name}</td><td><strong>${rz.priority}</strong></td><td>${(rz.score*100).toFixed(1)}%</td><td>${rz.zone.population.toLocaleString()}</td><td>${rz.zone.severity}/10</td><td>${rz.zone.roadAccess}</td></tr>`).join('')}</table>
+        <h3>4. Resource Allocation</h3>
+        <table><tr><th>Zone</th><th>🍱 Food</th><th>💧 Water</th><th>🏥 Medical</th><th>🚒 Rescue</th><th>🚑 Ambulance</th></tr>
+        ${zones.map(rz=>{const a=rz.allocation||{};return`<tr><td>${rz.zone.name}</td><td>${a.foodKits||0}</td><td>${a.waterUnits||0}</td><td>${a.medicalKits||0}</td><td>${a.rescueTeams||0}</td><td>${a.ambulances||0}</td></tr>`}).join('')}
+        <tr style="font-weight:700;border-top:2px solid var(--border)"><td>Remaining</td><td>${plan.remainingResources?.foodKits}</td><td>${plan.remainingResources?.waterUnits}</td><td>${plan.remainingResources?.medicalKits}</td><td>${plan.remainingResources?.rescueTeams}</td><td>${plan.remainingResources?.ambulances}</td></tr></table>
+        <h3>5. Priority Score Model</h3>
+        <div class="rpt-highlight">Priority = severity×0.27 + population×0.15 + vulnerability×0.16 + access×0.14 + medical×0.11 + incidents×0.08 + shelter×0.05 + weather×0.04</div>
+        <div class="rpt-footer">CrisisIQ — AI-Powered Disaster Response Platform · ${now} · ${id}<br>This report is auto-generated. Verify critical data before action.</div>`;
+    }
+
+    function renderExecutive(zones, now, id) {
+      const top = zones[0];
+      return `
+        <h2>📋 Executive Summary</h2>
+        <div class="rpt-meta">Report ID: ${id} · ${now}</div>
+        <div class="rpt-stat-grid">
+          <div class="rpt-stat"><div class="rpt-stat-val" style="color:#dc2626">${plan.totalAffectedPopulation?.toLocaleString()}</div><div class="rpt-stat-key">Affected</div></div>
+          <div class="rpt-stat"><div class="rpt-stat-val" style="color:#ea580c">${plan.criticalZoneCount}</div><div class="rpt-stat-key">Critical</div></div>
+          <div class="rpt-stat"><div class="rpt-stat-val">${zones.length}</div><div class="rpt-stat-key">Active Zones</div></div>
+        </div>
+        <div class="rpt-highlight">🤖 ${plan.decisionExplanation}</div>
+        <h3>Top Priority: ${top?.zone.name}</h3>
+        <p>Score: <strong>${(top?.score*100).toFixed(1)}%</strong> · Population: ${top?.zone.population.toLocaleString()} · Severity: ${top?.zone.severity}/10 · Access: ${top?.zone.roadAccess}</p>
+        <p><em>${top?.zone.notes}</em></p>
+        <h3>Recommended Actions</h3>
+        <ul>
+          <li>Deploy all available rescue teams to ${top?.zone.name} immediately</li>
+          <li>Open overflow shelters — current capacity stressed</li>
+          <li>Request additional ambulances from neighboring districts</li>
+          <li>Establish helicopter landing zone for blocked-access zones</li>
+        </ul>
+        <div class="rpt-footer">CrisisIQ Executive Summary · ${now}</div>`;
+    }
+
+    function renderResource(zones, now, id) {
+      const r = plan.resources || {};
+      const rem = plan.remainingResources || {};
+      return `
+        <h2>📦 Resource Utilization Report</h2>
+        <div class="rpt-meta">Report ID: ${id} · ${now}</div>
+        <h3>Available vs Deployed</h3>
+        <table><tr><th>Resource</th><th>Total Available</th><th>Deployed</th><th>Remaining</th><th>Utilization</th></tr>
+        ${[['🍱 Food Kits','foodKits'],['💧 Water Units','waterUnits'],['🏥 Medical Kits','medicalKits'],['🚒 Rescue Teams','rescueTeams'],['🚑 Ambulances','ambulances']].map(([label,key])=>{
+          const total=r[key]||0, left=rem[key]||0, used=total-left, pct=total>0?((used/total)*100).toFixed(0):0;
+          return`<tr><td>${label}</td><td>${total}</td><td><strong>${used}</strong></td><td>${left}</td><td><strong>${pct}%</strong></td></tr>`;
+        }).join('')}</table>
+        <h3>Per-Zone Allocation</h3>
+        <table><tr><th>Zone</th><th>🍱</th><th>💧</th><th>🏥</th><th>🚒</th><th>🚑</th></tr>
+        ${zones.map(rz=>{const a=rz.allocation||{};return`<tr><td>${rz.zone.name}</td><td>${a.foodKits||0}</td><td>${a.waterUnits||0}</td><td>${a.medicalKits||0}</td><td>${a.rescueTeams||0}</td><td>${a.ambulances||0}</td></tr>`}).join('')}</table>
+        <div class="rpt-footer">CrisisIQ Resource Report · ${now}</div>`;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Analytics — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 20px;max-width:1280px;margin:0 auto}
+    .chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .chart-header{padding:12px 16px;border-bottom:1px solid var(--border);font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;background:var(--bg-primary);display:flex;align-items:center;gap:6px}
+    .chart-body{padding:16px;position:relative;min-height:260px}
+    .chart-body canvas{max-height:280px}
+    .full-width{grid-column:1/-1}
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:14px 20px;max-width:1280px;margin:0 auto}
+    .stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;box-shadow:var(--shadow)}
+    .stat-value{font-size:1.6rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .stat-label{font-size:0.72rem;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px}
+    .stat-change{font-size:0.7rem;margin-top:4px;font-weight:600}
+    .stat-up{color:#16a34a}
+    .stat-down{color:#dc2626}
+    @media(max-width:800px){.analytics-grid{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(37,99,235,0.08)">📊</div>
+        <div><div class="nav-page-title">Analytics Dashboard</div><div class="nav-page-sub">Data Insights & Visualization</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-value" style="color:#dc2626" id="s-pop">—</div><div class="stat-label">Affected People</div><div class="stat-change stat-down">↑ High Risk</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#ea580c" id="s-crit">—</div><div class="stat-label">Critical Zones</div><div class="stat-change stat-down">Immediate Action</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#2563eb" id="s-eff">—</div><div class="stat-label">Response Efficiency</div><div class="stat-change stat-up">Resource Optimized</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#16a34a" id="s-cov">—</div><div class="stat-label">Coverage Rate</div><div class="stat-change stat-up">Above Threshold</div></div>
+  </div>
+
+  <div class="analytics-grid">
+    <div class="chart-card"><div class="chart-header">🔴 Severity Distribution</div><div class="chart-body"><canvas id="chart-severity"></canvas></div></div>
+    <div class="chart-card"><div class="chart-header">📦 Resource Allocation by Zone</div><div class="chart-body"><canvas id="chart-resources"></canvas></div></div>
+    <div class="chart-card"><div class="chart-header">👥 Population at Risk</div><div class="chart-body"><canvas id="chart-population"></canvas></div></div>
+    <div class="chart-card"><div class="chart-header">📈 Priority Score Ranking</div><div class="chart-body"><canvas id="chart-scores"></canvas></div></div>
+    <div class="chart-card full-width"><div class="chart-header">⚠️ Needs vs Allocation — Gap Analysis</div><div class="chart-body"><canvas id="chart-gap"></canvas></div></div>
+    <div class="chart-card full-width"><div class="chart-header">🧩 Score Component Breakdown</div><div class="chart-body"><canvas id="chart-components"></canvas></div></div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+    const COLORS = ['#dc2626','#ea580c','#ca8a04','#16a34a','#2563eb','#7c3aed','#db2777','#0891b2'];
+
+    async function init() {
+      let plan;
+      try { plan = await (await fetch('/api/plan')).json(); } catch(e) { return; }
+      const zones = plan.rankedZones || [];
+      const names = zones.map(rz => rz.zone.name);
+
+      // Stats
+      document.getElementById('s-pop').textContent = plan.totalAffectedPopulation?.toLocaleString() || '—';
+      document.getElementById('s-crit').textContent = plan.criticalZoneCount || '—';
+      const totalNeed = zones.reduce((s,rz)=>s+rz.zone.foodNeed+rz.zone.waterNeed+rz.zone.medicalNeed,0);
+      const totalAlloc = zones.reduce((s,rz)=>s+(rz.allocation?.foodKits||0)+(rz.allocation?.waterUnits||0)+(rz.allocation?.medicalKits||0),0);
+      const eff = totalNeed > 0 ? ((totalAlloc/totalNeed)*100).toFixed(0) : 0;
+      document.getElementById('s-eff').textContent = eff + '%';
+      document.getElementById('s-cov').textContent = ((zones.filter(rz=>(rz.allocation?.foodKits||0)>0).length/zones.length)*100).toFixed(0) + '%';
+
+      // Severity Donut
+      const sevCounts = {Critical:0,High:0,Medium:0,Low:0};
+      zones.forEach(rz => { sevCounts[rz.priority]=(sevCounts[rz.priority]||0)+1; });
+      new Chart(document.getElementById('chart-severity'),{type:'doughnut',data:{labels:Object.keys(sevCounts),datasets:[{data:Object.values(sevCounts),backgroundColor:['#dc2626','#ea580c','#ca8a04','#16a34a'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{family:'Inter',size:12}}}}}});
+
+      // Resources Stacked Bar
+      new Chart(document.getElementById('chart-resources'),{type:'bar',data:{labels:names,datasets:[
+        {label:'Food',data:zones.map(rz=>rz.allocation?.foodKits||0),backgroundColor:'#16a34a'},
+        {label:'Water',data:zones.map(rz=>rz.allocation?.waterUnits||0),backgroundColor:'#2563eb'},
+        {label:'Medical',data:zones.map(rz=>rz.allocation?.medicalKits||0),backgroundColor:'#db2777'}
+      ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Inter',size:11}}}},scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true}}}});
+
+      // Population Horizontal Bar
+      new Chart(document.getElementById('chart-population'),{type:'bar',data:{labels:names,datasets:[
+        {label:'Total',data:zones.map(rz=>rz.zone.population),backgroundColor:'#2563eb40',borderColor:'#2563eb',borderWidth:1},
+        {label:'Vulnerable',data:zones.map(rz=>rz.zone.vulnerablePeople),backgroundColor:'#dc262640',borderColor:'#dc2626',borderWidth:1}
+      ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Inter',size:11}}}},scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:9}}}}}});
+
+      // Score Ranking
+      const scores = zones.map(rz=>(rz.score*100));
+      new Chart(document.getElementById('chart-scores'),{type:'bar',data:{labels:names,datasets:[{label:'Priority Score (%)',data:scores,backgroundColor:zones.map((_,i)=>COLORS[i%COLORS.length]+'88'),borderColor:zones.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{max:100,ticks:{callback:v=>v+'%'}},x:{ticks:{font:{size:9}}}}}});
+
+      // Gap Analysis
+      new Chart(document.getElementById('chart-gap'),{type:'bar',data:{labels:names,datasets:[
+        {label:'Food Need',data:zones.map(rz=>rz.zone.foodNeed),backgroundColor:'#16a34a22',borderColor:'#16a34a',borderWidth:1.5},
+        {label:'Food Given',data:zones.map(rz=>rz.allocation?.foodKits||0),backgroundColor:'#16a34a',borderColor:'#16a34a',borderWidth:0},
+        {label:'Water Need',data:zones.map(rz=>rz.zone.waterNeed),backgroundColor:'#2563eb22',borderColor:'#2563eb',borderWidth:1.5},
+        {label:'Water Given',data:zones.map(rz=>rz.allocation?.waterUnits||0),backgroundColor:'#2563eb',borderColor:'#2563eb',borderWidth:0}
+      ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Inter',size:11}}}},scales:{x:{ticks:{font:{size:9}}}}}});
+
+      // Score Components Radar-like grouped bar
+      const compNames = ['Severity','Pop.Pressure','Vulnerability','Access','Medical','Incidents','Shelter Gap','Weather'];
+      new Chart(document.getElementById('chart-components'),{type:'bar',data:{labels:compNames,datasets:zones.slice(0,4).map((rz,i)=>({label:rz.zone.name,data:[rz.scoreComponents.severity,rz.scoreComponents.populationPressure,rz.scoreComponents.vulnerabilityShare,rz.scoreComponents.accessDifficulty,rz.scoreComponents.medicalUrgency,rz.scoreComponents.incidentReports,rz.scoreComponents.shelterGap,rz.scoreComponents.weatherRisk].map(v=>(v*1000).toFixed(1)),backgroundColor:COLORS[i]+'55',borderColor:COLORS[i],borderWidth:1.5}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Inter',size:11}}}},scales:{x:{ticks:{font:{size:10}}}}}});
+    }
+    init();
+  </script>
+</body>
+</html>

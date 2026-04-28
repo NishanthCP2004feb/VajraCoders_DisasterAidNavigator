@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Social Monitor — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .sm-layout{display:grid;grid-template-columns:1fr 320px;gap:14px;padding:14px 20px;min-height:calc(100vh - 54px)}
+    .sm-feed{display:flex;flex-direction:column;gap:10px}
+    .sm-sidebar{display:flex;flex-direction:column;gap:10px}
+    .tweet{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;box-shadow:var(--shadow);animation:tweet-in 0.4s ease}
+    @keyframes tweet-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    .tweet-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .tweet-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+    .tweet-user{font-weight:600;font-size:0.82rem}
+    .tweet-handle{font-size:0.72rem;color:var(--text-muted)}
+    .tweet-time{margin-left:auto;font-size:0.68rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+    .tweet-body{font-size:0.85rem;line-height:1.55;margin-bottom:8px;color:var(--text-primary)}
+    .tweet-body .hashtag{color:#2563eb;font-weight:600}
+    .tweet-body .mention{color:#7c3aed}
+    .tweet-footer{display:flex;align-items:center;gap:12px;font-size:0.72rem;color:var(--text-muted)}
+    .tweet-sentiment{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:0.68rem;font-weight:600}
+    .sent-panic{background:rgba(220,38,38,0.08);color:#dc2626}
+    .sent-distressed{background:rgba(234,88,12,0.08);color:#ea580c}
+    .sent-concerned{background:rgba(202,138,4,0.08);color:#a16207}
+    .sent-hopeful{background:rgba(22,163,74,0.08);color:#16a34a}
+    .sent-neutral{background:rgba(37,99,235,0.08);color:#2563eb}
+    .sentiment-meter{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .meter-body{padding:14px}
+    .meter-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .meter-emoji{font-size:1.2rem;width:28px;text-align:center}
+    .meter-label{font-size:0.72rem;color:var(--text-secondary);width:80px}
+    .meter-bar{flex:1;background:var(--bg-primary);border-radius:3px;height:8px;overflow:hidden}
+    .meter-fill{height:100%;border-radius:3px;transition:width 1s ease}
+    .meter-pct{font-size:0.7rem;font-family:'JetBrains Mono',monospace;color:var(--text-muted);width:30px;text-align:right}
+    .keyword-cloud{padding:14px;display:flex;flex-wrap:wrap;gap:6px}
+    .kw-tag{background:var(--bg-primary);border:1px solid var(--border);padding:3px 10px;border-radius:16px;font-size:0.72rem;color:var(--text-secondary);transition:all 0.2s}
+    .kw-tag:hover{border-color:var(--accent);color:var(--accent)}
+    .zone-sentiment{padding:10px 14px}
+    .zs-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .zs-name{font-weight:600;color:var(--text-primary)}
+    .zs-emoji{font-size:1.1rem}
+    .sm-controls{display:flex;gap:8px;padding:0 0 8px;align-items:center}
+    .sm-controls .badge{cursor:pointer;transition:all 0.2s}
+    .sm-controls .badge:hover{opacity:0.7}
+    .auto-label{font-size:0.72rem;color:var(--text-muted);display:flex;align-items:center;gap:4px}
+    @media(max-width:800px){.sm-layout{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(124,58,237,0.08)">📱</div>
+        <div><div class="nav-page-title">Social Media Monitor</div><div class="nav-page-sub">AI Sentiment Analysis</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div><span class="badge badge-high" id="post-count">0 Posts</span></div>
+  </nav>
+
+  <div class="sm-layout">
+    <div class="sm-feed">
+      <div class="sm-controls">
+        <span class="auto-label"><span class="dot dot-green" style="width:6px;height:6px;border-radius:50%;background:#16a34a;display:inline-block"></span> Auto-streaming</span>
+        <span style="margin-left:auto;font-size:0.72rem;color:var(--text-muted)">AI NLP Pipeline Active</span>
+      </div>
+      <div id="tweet-feed"></div>
+    </div>
+    <div class="sm-sidebar">
+      <div class="sentiment-meter">
+        <div class="card-header">😱 Overall Sentiment</div>
+        <div class="meter-body">
+          <div class="meter-row"><span class="meter-emoji">😱</span><span class="meter-label">Panic</span><div class="meter-bar"><div class="meter-fill" id="m-panic" style="width:35%;background:#dc2626"></div></div><span class="meter-pct" id="mp-panic">35%</span></div>
+          <div class="meter-row"><span class="meter-emoji">😰</span><span class="meter-label">Distressed</span><div class="meter-bar"><div class="meter-fill" id="m-distressed" style="width:28%;background:#ea580c"></div></div><span class="meter-pct" id="mp-distressed">28%</span></div>
+          <div class="meter-row"><span class="meter-emoji">😟</span><span class="meter-label">Concerned</span><div class="meter-bar"><div class="meter-fill" id="m-concerned" style="width:20%;background:#ca8a04"></div></div><span class="meter-pct" id="mp-concerned">20%</span></div>
+          <div class="meter-row"><span class="meter-emoji">🙏</span><span class="meter-label">Hopeful</span><div class="meter-bar"><div class="meter-fill" id="m-hopeful" style="width:12%;background:#16a34a"></div></div><span class="meter-pct" id="mp-hopeful">12%</span></div>
+          <div class="meter-row"><span class="meter-emoji">😐</span><span class="meter-label">Neutral</span><div class="meter-bar"><div class="meter-fill" id="m-neutral" style="width:5%;background:#2563eb"></div></div><span class="meter-pct" id="mp-neutral">5%</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">🏷️ Trending Keywords</div>
+        <div class="keyword-cloud" id="keywords">
+          <span class="kw-tag">#flood</span><span class="kw-tag">#rescue</span><span class="kw-tag">#emergency</span>
+          <span class="kw-tag">#help</span><span class="kw-tag">#evacuation</span><span class="kw-tag">#collapsed</span>
+          <span class="kw-tag">#trapped</span><span class="kw-tag">#shelter</span><span class="kw-tag">#relief</span>
+          <span class="kw-tag">#volunteers</span><span class="kw-tag">#donations</span><span class="kw-tag">#prayfor</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📍 Zone Sentiment</div>
+        <div class="zone-sentiment" id="zone-sentiments"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const TWEETS = [
+      {user:'Rajesh_K',name:'Rajesh Kumar',avatar:'👤',text:'OMG the building next to us just collapsed!! Water everywhere. Someone please help us 😭🆘 #flood #emergency #Chennai',sentiment:'panic',zone:'Riverside Delta',bg:'#fef2f2'},
+      {user:'PriyaOfficial',name:'Priya Nair',avatar:'👩',text:'Our entire street is under 3 feet of water. Elderly neighbors need evacuation NOW. @DisasterRelief please respond #help #rescue',sentiment:'distressed',zone:'Old Fisherman Port',bg:'#fff7ed'},
+      {user:'ArunSh_',name:'Arun Sharma',avatar:'👨',text:'Just saw rescue helicopters flying over Northern Hills. Hope they reach the trapped families in time. #prayfor #Chennai',sentiment:'hopeful',zone:'Hillcrest Valley',bg:'#f0fdf4'},
+      {user:'NewsDesk24',name:'NewsDesk 24/7',avatar:'📰',text:'BREAKING: 3 major roads blocked in South Coastal district. Emergency vehicles rerouting via Highway 12. #traffic #emergency',sentiment:'neutral',zone:'Market Square',bg:'#eff6ff'},
+      {user:'MedicalTeam1',name:'Dr. Sunita Rao',avatar:'⚕️',text:'Medical camp overwhelmed at Midtown. Running out of antibiotics and clean bandages. Need urgent resupply! #medical #relief',sentiment:'distressed',zone:'Midtown Refugee Camp',bg:'#fff7ed'},
+      {user:'VolunteerNet',name:'Volunteer Network',avatar:'🤝',text:'250 volunteers mobilized! Distributing water and food packets at Shelter B. Together we are strong 💪 #volunteers #community',sentiment:'hopeful',zone:'Market Square',bg:'#f0fdf4'},
+      {user:'FarmerJohn',name:'Mahesh Patel',avatar:'🧑‍🌾',text:'All our crops destroyed by flooding. Water is contaminated, children are falling sick. We need clean water desperately #help #rural',sentiment:'panic',zone:'Northern Farmlands',bg:'#fef2f2'},
+      {user:'TechParkRes',name:'Vikram Singh',avatar:'💻',text:'Tech Park area relatively safe. Power restored. Organizing donation drive for affected zones. DM for drop-off points #donations',sentiment:'hopeful',zone:'Tech Park Suburb',bg:'#f0fdf4'},
+      {user:'PortWorker',name:'Fisherman Ravi',avatar:'🎣',text:'Entire port district gone. Boats smashed. Families huddled on rooftops waiting for rescue. Please send boats!! 😢 #trapped',sentiment:'panic',zone:'Old Fisherman Port',bg:'#fef2f2'},
+      {user:'RescueWatch',name:'Rescue Operations',avatar:'🚒',text:'Update: Team Alpha has rescued 45 people from Hillcrest Valley. Operations continuing. Stay strong. #rescue #update',sentiment:'hopeful',zone:'Hillcrest Valley',bg:'#f0fdf4'},
+      {user:'WeatherAlert',name:'Met Department',avatar:'🌦️',text:'⚠️ Another heavy rainfall band expected in 2 hours. All zones prepare for secondary flooding. Evacuate low areas immediately. #weather',sentiment:'concerned',zone:'All Zones',bg:'#fefce8'},
+      {user:'ChennaiFire',name:'Fire & Rescue',avatar:'🚒',text:'Gas leak contained at Industrial Docklands. Area evacuated safely. No casualties. Chemical team on standby. #safety',sentiment:'neutral',zone:'Industrial Docklands',bg:'#eff6ff'},
+      {user:'MomOfThree',name:'Lakshmi Devi',avatar:'👩‍👧‍👦',text:'My children are terrified. We have been in the shelter for 14 hours. When will this end? Need baby formula and diapers #help',sentiment:'distressed',zone:'Midtown Refugee Camp',bg:'#fff7ed'},
+      {user:'NGOrelief',name:'Relief Foundation',avatar:'🏥',text:'Mobile medical unit deployed to Northern Farmlands. Treating water-borne illness cases. Donations needed at relieffund.org #medical',sentiment:'concerned',zone:'Northern Farmlands',bg:'#fefce8'},
+    ];
+
+    const SENTIMENTS = {panic:0,distressed:0,concerned:0,hopeful:0,neutral:0};
+    const ZONE_SENT = {};
+    let tweetIdx = 0;
+    let totalPosts = 0;
+
+    function addTweet() {
+      const t = TWEETS[tweetIdx % TWEETS.length];
+      const time = new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
+      const sentClass = 'sent-' + t.sentiment;
+      const sentLabel = t.sentiment.charAt(0).toUpperCase() + t.sentiment.slice(1);
+      const body = t.text.replace(/#(\w+)/g,'<span class="hashtag">#$1</span>').replace(/@(\w+)/g,'<span class="mention">@$1</span>');
+
+      const div = document.createElement('div');
+      div.className = 'tweet';
+      div.style.borderLeftColor = t.bg;
+      div.innerHTML = `
+        <div class="tweet-header">
+          <div class="tweet-avatar" style="background:${t.bg}">${t.avatar}</div>
+          <div><div class="tweet-user">${t.name}</div><div class="tweet-handle">@${t.user}</div></div>
+          <span class="tweet-time">${time}</span>
+        </div>
+        <div class="tweet-body">${body}</div>
+        <div class="tweet-footer">
+          <span class="tweet-sentiment ${sentClass}">AI: ${sentLabel}</span>
+          <span>📍 ${t.zone}</span>
+        </div>`;
+
+      const feed = document.getElementById('tweet-feed');
+      feed.insertBefore(div, feed.firstChild);
+      if (feed.children.length > 15) feed.removeChild(feed.lastChild);
+
+      // Update counts
+      SENTIMENTS[t.sentiment]++;
+      totalPosts++;
+      ZONE_SENT[t.zone] = t.sentiment;
+      document.getElementById('post-count').textContent = totalPosts + ' Posts';
+      updateMeters();
+      updateZoneSentiments();
+      tweetIdx++;
+    }
+
+    function updateMeters() {
+      const total = Object.values(SENTIMENTS).reduce((a,b)=>a+b,0) || 1;
+      ['panic','distressed','concerned','hopeful','neutral'].forEach(s => {
+        const pct = ((SENTIMENTS[s]/total)*100).toFixed(0);
+        document.getElementById('m-'+s).style.width = pct+'%';
+        document.getElementById('mp-'+s).textContent = pct+'%';
+      });
+    }
+
+    function updateZoneSentiments() {
+      const el = document.getElementById('zone-sentiments');
+      const emojis = {panic:'😱',distressed:'😰',concerned:'😟',hopeful:'🙏',neutral:'😐'};
+      el.innerHTML = Object.entries(ZONE_SENT).map(([zone,sent]) =>
+        `<div class="zs-row"><span class="zs-name">${zone}</span><span class="zs-emoji">${emojis[sent]||'😐'}</span></div>`
+      ).join('');
+    }
+
+    // Initial batch + auto-stream
+    addTweet(); addTweet(); addTweet();
+    setInterval(addTweet, 5000);
+  </script>
+</body>
+</html>

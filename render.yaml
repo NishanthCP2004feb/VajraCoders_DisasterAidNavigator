@@ -1,8 +1,10 @@
 services:
   - type: web
-    name: disasteraid-navigator
-    env: node
+    name: crisisiq
+    runtime: node
     plan: free
     buildCommand: npm install
     startCommand: npm start
-    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Command Chat — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/shared.css" />
+  <style>
+    .chat-layout{display:grid;grid-template-columns:1fr 320px;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
+    .chat-main{display:flex;flex-direction:column;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+    .msg{max-width:85%;padding:10px 14px;border-radius:12px;font-size:0.85rem;line-height:1.55;animation:msg-in 0.3s ease}
+    @keyframes msg-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .msg-user{align-self:flex-end;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;border-bottom-right-radius:4px}
+    .msg-ai{align-self:flex-start;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-primary);border-bottom-left-radius:4px}
+    .msg-ai strong{color:#7c3aed}
+    .msg-system{align-self:center;background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.15);color:#1d4ed8;font-size:0.75rem;border-radius:20px;padding:5px 14px}
+    .msg-typing{align-self:flex-start;background:var(--bg-primary);border:1px solid var(--border);padding:12px 16px;border-radius:12px;display:flex;gap:5px}
+    .msg-typing span{width:7px;height:7px;background:var(--text-muted);border-radius:50%;animation:bounce 1.4s ease-in-out infinite}
+    .msg-typing span:nth-child(2){animation-delay:0.2s}
+    .msg-typing span:nth-child(3){animation-delay:0.4s}
+    @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+    .chat-input-bar{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);background:var(--bg-primary)}
+    .chat-input{flex:1;border:1px solid var(--border);background:var(--bg-card);border-radius:8px;padding:10px 14px;font-size:0.85rem;font-family:'Inter',sans-serif;outline:none;color:var(--text-primary);resize:none}
+    .chat-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+    .chat-send{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.2s}
+    .chat-send:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(124,58,237,0.3)}
+    .chat-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .suggestion-list{display:flex;flex-direction:column;gap:6px;padding:10px}
+    .suggestion{padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;font-size:0.75rem;color:var(--text-secondary);cursor:pointer;transition:all 0.2s;line-height:1.4}
+    .suggestion:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+    .context-panel{padding:10px 12px;font-size:0.75rem}
+    .ctx-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)}
+    .ctx-label{color:var(--text-muted)}
+    .ctx-val{font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text-primary);font-size:0.73rem}
+    @media(max-width:800px){.chat-layout{grid-template-columns:1fr}.chat-sidebar{display:none}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(124,58,237,0.08)">🤖</div>
+        <div><div class="nav-page-title">AI Command Chat</div><div class="nav-page-sub">Natural Language Disaster Control</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="chat-layout">
+    <div class="chat-main">
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg msg-system">🤖 CrisisIQ AI initialized — I have access to all zone data, resources, and live signals.</div>
+        <div class="msg msg-ai"><strong>CrisisIQ AI:</strong> Hello, Commander. I'm monitoring 8 disaster zones with 52,200 affected people. 3 zones are in critical condition. How can I assist you?</div>
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" id="chat-input" placeholder="Ask a question or issue a command..." autocomplete="off" />
+        <button class="chat-send" id="chat-send">Send ⟩</button>
+      </div>
+    </div>
+
+    <div class="chat-sidebar">
+      <div class="card">
+        <div class="card-header">💡 Try These Commands</div>
+        <div class="suggestion-list" id="suggestions">
+          <div class="suggestion" data-q="What is the most critical zone right now?">What is the most critical zone right now?</div>
+          <div class="suggestion" data-q="Show me the resource allocation for all zones">Show me resource allocation for all zones</div>
+          <div class="suggestion" data-q="How many people are in danger?">How many people are in danger?</div>
+          <div class="suggestion" data-q="Which zones have blocked roads?">Which zones have blocked roads?</div>
+          <div class="suggestion" data-q="Recommend ambulance deployment">Recommend ambulance deployment</div>
+          <div class="suggestion" data-q="What is the weather situation?">What is the weather situation?</div>
+          <div class="suggestion" data-q="Generate an emergency summary report">Generate an emergency summary report</div>
+          <div class="suggestion" data-q="Compare Riverside Delta vs Old Fisherman Port">Compare Riverside Delta vs Old Fisherman Port</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📡 Live Context</div>
+        <div class="context-panel" id="context-panel">
+          <div class="ctx-row"><span class="ctx-label">Zones</span><span class="ctx-val" id="ctx-zones">8 active</span></div>
+          <div class="ctx-row"><span class="ctx-label">Critical</span><span class="ctx-val" id="ctx-critical">3 zones</span></div>
+          <div class="ctx-row"><span class="ctx-label">Population</span><span class="ctx-val" id="ctx-pop">52,200</span></div>
+          <div class="ctx-row"><span class="ctx-label">AI Queries</span><span class="ctx-val" id="ctx-queries">0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Clock
+    setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false}); }, 1000);
+
+    let zoneData = null;
+    let planData = null;
+    let queryCount = 0;
+
+    // Load data
+    async function loadData() {
+      try {
+        const [zRes, pRes] = await Promise.all([fetch('/api/zones'), fetch('/api/plan')]);
+        zoneData = await zRes.json();
+        planData = await pRes.json();
+      } catch(e) { console.error(e); }
+    }
+    loadData();
+
+    // Chat logic
+    const messagesDiv = document.getElementById('chat-messages');
+    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send');
+
+    function addMsg(type, text) {
+      const div = document.createElement('div');
+      div.className = 'msg msg-' + type;
+      div.innerHTML = type === 'ai' ? '<strong>CrisisIQ AI:</strong> ' + text : text;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      return div;
+    }
+
+    function showTyping() {
+      const div = document.createElement('div');
+      div.className = 'msg-typing';
+      div.id = 'typing';
+      div.innerHTML = '<span></span><span></span><span></span>';
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function hideTyping() {
+      const t = document.getElementById('typing');
+      if (t) t.remove();
+    }
+
+    async function handleQuery(question) {
+      addMsg('user', question);
+      input.value = '';
+      showTyping();
+      queryCount++;
+      document.getElementById('ctx-queries').textContent = queryCount;
+
+      await new Promise(r => setTimeout(r, 800 + Math.random() * 1200));
+      hideTyping();
+
+      const answer = generateAnswer(question);
+      addMsg('ai', answer);
+    }
+
+    function generateAnswer(q) {
+      const ql = q.toLowerCase();
+      const zones = planData?.rankedZones || [];
+      const top = zones[0];
+
+      if (ql.includes('critical') || ql.includes('most urgent') || ql.includes('priority')) {
+        if (!top) return 'I need plan data first. Please generate a plan from the Command Center.';
+        const z = top.zone;
+        return `<strong style="color:#dc2626">${z.name}</strong> is the highest-priority zone with a score of <strong>${(top.score*100).toFixed(1)}%</strong>.<br><br>` +
+          `📍 District: ${z.district}<br>👥 Population: ${z.population.toLocaleString()}<br>⚠️ Severity: ${z.severity}/10<br>🚧 Road Access: ${z.roadAccess}<br>🏥 Hospital: ${z.hospitalDistanceKm}km away<br><br>` +
+          `<em>Recommendation: Deploy rescue teams and ambulances immediately. Road access is ${z.roadAccess}, consider helicopter support if available.</em>`;
+      }
+
+      if (ql.includes('resource') || ql.includes('allocation')) {
+        if (!zones.length) return 'No allocation plan generated yet. Please run the allocation engine first.';
+        let table = '<table style="width:100%;border-collapse:collapse;font-size:0.75rem;margin-top:8px">';
+        table += '<tr style="border-bottom:2px solid #e0e4ea"><th style="text-align:left;padding:4px">Zone</th><th>🍱</th><th>💧</th><th>🏥</th><th>🚒</th><th>🚑</th></tr>';
+        zones.forEach(rz => {
+          const a = rz.allocation || {};
+          table += `<tr style="border-bottom:1px solid #eee"><td style="padding:4px;font-weight:600">${rz.zone.name}</td><td style="text-align:center">${a.foodKits||0}</td><td style="text-align:center">${a.waterUnits||0}</td><td style="text-align:center">${a.medicalKits||0}</td><td style="text-align:center">${a.rescueTeams||0}</td><td style="text-align:center">${a.ambulances||0}</td></tr>`;
+        });
+        table += '</table>';
+        return 'Here is the current resource allocation across all zones:' + table;
+      }
+
+      if (ql.includes('people') || ql.includes('danger') || ql.includes('population')) {
+        const total = zones.reduce((s, rz) => s + rz.zone.population, 0);
+        const vuln = zones.reduce((s, rz) => s + rz.zone.vulnerablePeople, 0);
+        return `<strong>${total.toLocaleString()}</strong> people are in affected zones.<br>` +
+          `<strong style="color:#dc2626">${vuln.toLocaleString()}</strong> are classified as vulnerable (children, elderly, disabled).<br><br>` +
+          `The most impacted zone is <strong>${top?.zone.name}</strong> with ${top?.zone.population.toLocaleString()} people.`;
+      }
+
+      if (ql.includes('blocked') || ql.includes('road') || ql.includes('access')) {
+        const blocked = zones.filter(rz => rz.zone.roadAccess === 'blocked');
+        const partial = zones.filter(rz => rz.zone.roadAccess === 'partial');
+        let resp = `<strong style="color:#dc2626">${blocked.length} zones</strong> have completely blocked roads:<br>`;
+        blocked.forEach(rz => { resp += `• ${rz.zone.name} — ${rz.zone.blockedRoads} blocked roads<br>`; });
+        resp += `<br><strong style="color:#ca8a04">${partial.length} zones</strong> have partial access:<br>`;
+        partial.forEach(rz => { resp += `• ${rz.zone.name} — ${rz.zone.blockedRoads} blocked roads<br>`; });
+        resp += '<br><em>Recommendation: Use helicopter or boat routes for fully blocked zones.</em>';
+        return resp;
+      }
+
+      if (ql.includes('ambulance')) {
+        const sorted = [...zones].sort((a,b) => (b.scoreComponents?.medicalUrgency||0) - (a.scoreComponents?.medicalUrgency||0));
+        let resp = 'Based on medical urgency analysis, here is my ambulance deployment recommendation:<br><br>';
+        sorted.slice(0,4).forEach((rz,i) => {
+          resp += `<strong>${i+1}. ${rz.zone.name}</strong> — Hospital ${rz.zone.hospitalDistanceKm}km away, ${rz.zone.medicalNeed} medical cases<br>`;
+        });
+        resp += '<br><em>Priority: Deploy to zones with highest hospital distance and medical need first.</em>';
+        return resp;
+      }
+
+      if (ql.includes('weather')) {
+        const w = planData?.weatherData;
+        if (!w) return 'Weather data not yet loaded. Please generate a plan first.';
+        return `Current weather conditions at the command hub:<br><br>` +
+          `🌤️ Status: <strong>${w.status}</strong><br>🌧️ Precipitation: <strong>${w.precipitation} mm</strong><br>💨 Wind: <strong>${w.windspeed} km/h</strong><br>⚠️ Risk Score: <strong>${(w.riskScore*100).toFixed(0)}%</strong><br><br>` +
+          `<em>Source: ${w.source}</em>`;
+      }
+
+      if (ql.includes('report') || ql.includes('summary')) {
+        if (!zones.length) return 'No data available for report. Generate a plan first.';
+        const total = zones.reduce((s,rz) => s + rz.zone.population, 0);
+        const critical = zones.filter(rz => rz.zone.severity >= 8).length;
+        return `<strong>📋 EMERGENCY SITUATION REPORT</strong><br>` +
+          `<strong>Generated:</strong> ${new Date().toLocaleString()}<br><hr style="border-color:#e0e4ea;margin:6px 0">` +
+          `<strong>Total Affected:</strong> ${total.toLocaleString()} people<br>` +
+          `<strong>Critical Zones:</strong> ${critical}<br>` +
+          `<strong>Active Zones:</strong> ${zones.length}<br>` +
+          `<strong>Top Priority:</strong> ${top.zone.name} (${(top.score*100).toFixed(1)}%)<br>` +
+          `<strong>Weather:</strong> ${planData?.weatherData?.status || 'N/A'}<br>` +
+          `<strong>Seismic Activity:</strong> ${planData?.earthquakeData?.count || 0} events<br><hr style="border-color:#e0e4ea;margin:6px 0">` +
+          `<em>Full PDF report available in the Report Generator module.</em>`;
+      }
+
+      if (ql.includes('compare')) {
+        const names = zones.map(rz => rz.zone.name.toLowerCase());
+        const found = zones.filter(rz => ql.includes(rz.zone.name.toLowerCase().split(' ')[0].toLowerCase()));
+        if (found.length >= 2) {
+          const [a,b] = found;
+          return `<strong>Comparison: ${a.zone.name} vs ${b.zone.name}</strong><br><br>` +
+            `<table style="width:100%;border-collapse:collapse;font-size:0.75rem"><tr style="border-bottom:2px solid #e0e4ea"><th style="text-align:left;padding:4px">Metric</th><th>${a.zone.name}</th><th>${b.zone.name}</th></tr>` +
+            `<tr><td style="padding:4px">Score</td><td style="text-align:center;font-weight:700;color:${a.score>b.score?'#dc2626':'#475569'}">${(a.score*100).toFixed(1)}%</td><td style="text-align:center;font-weight:700;color:${b.score>a.score?'#dc2626':'#475569'}">${(b.score*100).toFixed(1)}%</td></tr>` +
+            `<tr><td style="padding:4px">Population</td><td style="text-align:center">${a.zone.population.toLocaleString()}</td><td style="text-align:center">${b.zone.population.toLocaleString()}</td></tr>` +
+            `<tr><td style="padding:4px">Severity</td><td style="text-align:center">${a.zone.severity}/10</td><td style="text-align:center">${b.zone.severity}/10</td></tr>` +
+            `<tr><td style="padding:4px">Road Access</td><td style="text-align:center">${a.zone.roadAccess}</td><td style="text-align:center">${b.zone.roadAccess}</td></tr></table>`;
+        }
+        return 'Please specify two zone names to compare, e.g., "Compare Riverside Delta vs Market Square"';
+      }
+
+      // Default intelligent response
+      return `I understand you're asking about: "<em>${q}</em>"<br><br>Here's what I can help with:<br>` +
+        `• <strong>Zone status</strong> — "What is the most critical zone?"<br>` +
+        `• <strong>Resources</strong> — "Show resource allocation"<br>` +
+        `• <strong>Population</strong> — "How many people are in danger?"<br>` +
+        `• <strong>Roads</strong> — "Which zones have blocked roads?"<br>` +
+        `• <strong>Deployment</strong> — "Recommend ambulance deployment"<br>` +
+        `• <strong>Weather</strong> — "What is the weather situation?"<br>` +
+        `• <strong>Reports</strong> — "Generate an emergency summary"<br>` +
+        `• <strong>Compare</strong> — "Compare Zone A vs Zone B"`;
+    }
+
+    // Event listeners
+    sendBtn.addEventListener('click', () => { if (input.value.trim()) handleQuery(input.value.trim()); });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter' && input.value.trim()) handleQuery(input.value.trim()); });
+    document.getElementById('suggestions').addEventListener('click', e => {
+      const s = e.target.closest('.suggestion');
+      if (s) handleQuery(s.dataset.q);
+    });
+  </script>
+</body>
+</html>
