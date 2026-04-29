@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Offline Mesh Network — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .mesh-layout{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 20px;max-width:1400px;margin:0 auto;min-height:calc(100vh - 54px)}
+    .mesh-full{grid-column:1/-1}
+    .mesh-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;grid-column:1/-1}
+    .m-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow)}
+    .m-stat-val{font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .m-stat-key{font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .mesh-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .network-status{padding:16px;text-align:center;border-bottom:1px solid var(--border)}
+    .net-indicator{display:inline-flex;align-items:center;gap:10px;padding:10px 24px;border-radius:30px;font-size:0.9rem;font-weight:700}
+    .net-indicator.online{background:rgba(22,163,74,0.08);color:#16a34a;border:2px solid rgba(22,163,74,0.3)}
+    .net-indicator.offline{background:rgba(220,38,38,0.08);color:#dc2626;border:2px solid rgba(220,38,38,0.3);animation:offline-blink 1.5s infinite}
+    @keyframes offline-blink{0%,100%{opacity:1}50%{opacity:0.6}}
+    .net-dot{width:12px;height:12px;border-radius:50%}
+    .net-dot.online{background:#16a34a;box-shadow:0 0 8px rgba(22,163,74,0.5)}
+    .net-dot.offline{background:#dc2626;box-shadow:0 0 8px rgba(220,38,38,0.5)}
+    .btn-toggle-net{background:var(--bg-primary);border:2px solid var(--border);border-radius:10px;padding:10px 20px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;color:var(--text-primary);transition:all 0.2s;margin:10px}
+    .btn-toggle-net:hover{border-color:var(--accent)}
+    .btn-toggle-net.danger{border-color:#dc2626;color:#dc2626}
+    .mesh-viz{position:relative;height:300px;background:var(--bg-primary);border-radius:10px;margin:14px;overflow:hidden}
+    .mesh-node{position:absolute;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;cursor:pointer;transition:all 0.3s;z-index:2}
+    .mesh-node.hub{background:#7c3aed;box-shadow:0 0 20px rgba(124,58,237,0.4)}
+    .mesh-node.device{background:var(--bg-card);border:2px solid var(--border);box-shadow:var(--shadow)}
+    .mesh-node.device.active{border-color:#16a34a;box-shadow:0 0 12px rgba(22,163,74,0.3)}
+    .mesh-node.device.relaying{border-color:#f59e0b;animation:relay-pulse 0.8s infinite;box-shadow:0 0 12px rgba(245,158,11,0.4)}
+    .mesh-node.device.offline-cached{border-color:#dc2626;border-style:dashed}
+    @keyframes relay-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+    .mesh-line{position:absolute;height:2px;transform-origin:left center;z-index:1;transition:all 0.5s}
+    .mesh-line.active{background:#16a34a}
+    .mesh-line.relay{background:#f59e0b;animation:line-flow 1s infinite}
+    .mesh-line.dead{background:#dc262640;border-top:2px dashed #dc262660}
+    @keyframes line-flow{0%{opacity:0.3}50%{opacity:1}100%{opacity:0.3}}
+    .mesh-packet{position:absolute;width:8px;height:8px;border-radius:50%;background:#f59e0b;z-index:3;transition:all 0.5s}
+    .cache-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem;animation:cache-in 0.3s ease}
+    @keyframes cache-in{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+    .cache-icon{font-size:1.1rem}
+    .cache-info{flex:1}
+    .cache-type{font-weight:700;font-size:0.82rem}
+    .cache-meta{font-size:0.68rem;color:var(--text-muted)}
+    .cache-status{padding:2px 8px;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase}
+    .sync-log{padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.72rem;display:flex;align-items:flex-start;gap:8px;animation:cache-in 0.3s ease}
+    .sync-time{font-family:'JetBrains Mono',monospace;color:var(--text-muted);flex-shrink:0;width:60px}
+    .sync-msg{flex:1;line-height:1.5}
+    .btn-sos-offline{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:700;cursor:pointer;width:calc(100% - 28px);margin:14px;font-family:'Inter',sans-serif;transition:all 0.2s}
+    .btn-sos-offline:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(220,38,38,0.3)}
+    .btn-sync{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:10px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer;width:calc(100% - 28px);margin:0 14px 14px;font-family:'Inter',sans-serif;transition:all 0.2s}
+    .btn-sync:hover{box-shadow:0 4px 12px rgba(37,99,235,0.3)}
+    .btn-sync:disabled{opacity:0.4;cursor:default}
+    .storage-bar{margin:0 14px 14px;background:var(--bg-primary);border-radius:6px;height:10px;overflow:hidden}
+    .storage-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#16a34a,#ca8a04,#dc2626);transition:width 0.5s}
+    .storage-label{display:flex;justify-content:space-between;padding:0 14px 10px;font-size:0.68rem;color:var(--text-muted)}
+    @media(max-width:900px){.mesh-layout{grid-template-columns:1fr}.mesh-stats{grid-template-columns:repeat(3,1fr)}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(245,158,11,0.08)">📡</div>
+        <div><div class="nav-page-title">Offline Mesh Network</div><div class="nav-page-sub">Device-to-Device Relay · Offline Cache · Auto-Sync</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div id="net-badge" class="nav-live"><span class="dot"></span> ONLINE</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="mesh-layout">
+    <div class="mesh-stats">
+      <div class="m-stat"><div class="m-stat-val" style="color:#16a34a" id="s-devices">0</div><div class="m-stat-key">Mesh Devices</div></div>
+      <div class="m-stat"><div class="m-stat-val" style="color:#f59e0b" id="s-cached">0</div><div class="m-stat-key">Cached Messages</div></div>
+      <div class="m-stat"><div class="m-stat-val" style="color:#2563eb" id="s-synced">0</div><div class="m-stat-key">Synced</div></div>
+      <div class="m-stat"><div class="m-stat-val" style="color:#dc2626" id="s-pending">0</div><div class="m-stat-key">Pending Sync</div></div>
+      <div class="m-stat"><div class="m-stat-val" style="color:#7c3aed" id="s-relays">0</div><div class="m-stat-key">Relay Hops</div></div>
+    </div>
+
+    <div class="mesh-card mesh-full">
+      <div class="card-header">📡 Mesh Network Topology</div>
+      <div class="network-status">
+        <div class="net-indicator online" id="net-status"><span class="net-dot online" id="net-dot"></span><span id="net-text">INTERNET CONNECTED</span></div>
+        <button class="btn-toggle-net" id="btn-toggle">⚡ Simulate Network Failure</button>
+      </div>
+      <div class="mesh-viz" id="mesh-viz"></div>
+    </div>
+
+    <div class="mesh-card">
+      <div class="card-header">💾 Offline Cache (localStorage)</div>
+      <div class="storage-label"><span>Storage Used</span><span id="storage-pct">0%</span></div>
+      <div class="storage-bar"><div class="storage-fill" id="storage-fill" style="width:0%"></div></div>
+      <div id="cache-list" style="max-height:250px;overflow-y:auto"><div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.78rem">No cached data</div></div>
+      <button class="btn-sos-offline" id="btn-sos">🆘 Send Offline SOS</button>
+      <button class="btn-sync" id="btn-sync">🔄 Force Sync to Server</button>
+    </div>
+
+    <div class="mesh-card">
+      <div class="card-header">📜 Sync & Relay Log</div>
+      <div id="sync-log" style="max-height:380px;overflow-y:auto"><div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.78rem">No events</div></div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    let isOnline=true;let meshDevices=[];let cachedMessages=[];let syncLog=[];
+    let syncedCount=0;let relayCount=0;
+
+    // Mesh device definitions
+    const DEVICE_DEFS=[
+      {id:'HUB',label:'🏛️',type:'hub',x:50,y:50,name:'Command Hub'},
+      {id:'D1',label:'📱',type:'device',x:15,y:20,name:'Field Team Alpha'},
+      {id:'D2',label:'📱',type:'device',x:80,y:15,name:'Field Team Bravo'},
+      {id:'D3',label:'📱',type:'device',x:20,y:75,name:'Medical Unit 1'},
+      {id:'D4',label:'📱',type:'device',x:85,y:70,name:'Rescue Squad Delta'},
+      {id:'D5',label:'📡',type:'device',x:45,y:85,name:'Relay Station'},
+      {id:'D6',label:'📱',type:'device',x:10,y:50,name:'Volunteer Group'},
+      {id:'D7',label:'🚑',type:'device',x:75,y:45,name:'Ambulance Unit'},
+    ];
+
+    const CONNECTIONS=[
+      ['HUB','D1'],['HUB','D2'],['HUB','D7'],['HUB','D5'],
+      ['D1','D3'],['D1','D6'],['D2','D4'],['D2','D7'],
+      ['D3','D5'],['D4','D5'],['D5','D6'],['D3','D6']
+    ];
+
+    function initMeshViz(){
+      const viz=document.getElementById('mesh-viz');
+      viz.innerHTML='';
+
+      // Draw connections
+      CONNECTIONS.forEach(([from,to],i)=>{
+        const a=DEVICE_DEFS.find(d=>d.id===from);
+        const b=DEVICE_DEFS.find(d=>d.id===to);
+        const dx=(b.x-a.x)/100*viz.offsetWidth;
+        const dy=(b.y-a.y)/100*viz.offsetHeight;
+        const len=Math.sqrt(dx*dx+dy*dy);
+        const angle=Math.atan2(dy,dx)*180/Math.PI;
+        const line=document.createElement('div');
+        line.className='mesh-line active';
+        line.id='line-'+i;
+        line.style.left=(a.x/100*viz.offsetWidth+22)+'px';
+        line.style.top=(a.y/100*viz.offsetHeight+22)+'px';
+        line.style.width=len+'px';
+        line.style.transform='rotate('+angle+'deg)';
+        viz.appendChild(line);
+      });
+
+      // Draw nodes
+      DEVICE_DEFS.forEach(d=>{
+        const node=document.createElement('div');
+        node.className='mesh-node '+(d.type==='hub'?'hub':'device active');
+        node.id='node-'+d.id;
+        node.style.left='calc('+d.x+'% - 22px)';
+        node.style.top='calc('+d.y+'% - 22px)';
+        node.textContent=d.label;
+        node.title=d.name;
+        viz.appendChild(node);
+      });
+
+      document.getElementById('s-devices').textContent=DEVICE_DEFS.length;
+    }
+
+    // Toggle network
+    document.getElementById('btn-toggle').addEventListener('click',()=>{
+      isOnline=!isOnline;
+      const status=document.getElementById('net-status');
+      const dot=document.getElementById('net-dot');
+      const text=document.getElementById('net-text');
+      const btn=document.getElementById('btn-toggle');
+      const badge=document.getElementById('net-badge');
+
+      if(isOnline){
+        status.className='net-indicator online';
+        dot.className='net-dot online';
+        text.textContent='INTERNET CONNECTED';
+        btn.textContent='⚡ Simulate Network Failure';
+        btn.className='btn-toggle-net';
+        badge.innerHTML='<span class="dot"></span> ONLINE';
+
+        // Restore hub connections
+        CONNECTIONS.forEach((c,i)=>{
+          const line=document.getElementById('line-'+i);
+          if(line)line.className='mesh-line active';
+        });
+        DEVICE_DEFS.forEach(d=>{
+          const node=document.getElementById('node-'+d.id);
+          if(node&&d.type==='device')node.className='mesh-node device active';
+        });
+
+        addSyncLog('🟢','Network restored! Auto-sync initiated...','#16a34a');
+        setTimeout(()=>autoSync(),1000);
+      }else{
+        status.className='net-indicator offline';
+        dot.className='net-dot offline';
+        text.textContent='INTERNET DISCONNECTED';
+        btn.textContent='🔌 Restore Connection';
+        btn.className='btn-toggle-net danger';
+        badge.innerHTML='<span class="dot" style="background:#dc2626"></span> OFFLINE';
+
+        // Break hub connections
+        CONNECTIONS.forEach((c,i)=>{
+          if(c.includes('HUB')){
+            const line=document.getElementById('line-'+i);
+            if(line)line.className='mesh-line dead';
+          }
+        });
+        // Show devices as offline-cached
+        DEVICE_DEFS.forEach(d=>{
+          if(d.type==='device'){
+            const node=document.getElementById('node-'+d.id);
+            if(node)node.className='mesh-node device offline-cached';
+          }
+        });
+
+        addSyncLog('🔴','Network failure detected! Switching to mesh relay mode.','#dc2626');
+        addSyncLog('📡','Devices now communicating via Wi-Fi Direct mesh.','#f59e0b');
+      }
+    });
+
+    // Offline SOS
+    document.getElementById('btn-sos').addEventListener('click',()=>{
+      const sos={
+        id:'SOS-'+String(cachedMessages.length+1).padStart(3,'0'),
+        type:'SOS',
+        data:{
+          name:['Rescue Team Alpha','Medical Unit Beta','Volunteer Group','Field Worker'][Math.floor(Math.random()*4)],
+          location:'13.'+Math.floor(Math.random()*99)+', 80.'+Math.floor(Math.random()*99),
+          people:Math.floor(Math.random()*20)+1,
+          urgency:['Critical','High','Medium'][Math.floor(Math.random()*3)]
+        },
+        timestamp:new Date().toISOString(),
+        synced:false,
+        relayHops:0
+      };
+
+      cachedMessages.unshift(sos);
+      localStorage.setItem('crisisiq_offline_cache',JSON.stringify(cachedMessages));
+
+      if(!isOnline){
+        // Simulate mesh relay
+        simulateRelay(sos);
+      }else{
+        sos.synced=true;
+        syncedCount++;
+        addSyncLog('✅','SOS '+sos.id+' sent directly to server (online).','#16a34a');
+      }
+
+      renderCache();
+      updateStats();
+    });
+
+    function simulateRelay(msg){
+      const path=['D1','D3','D5','HUB'];
+      let delay=0;
+      msg.relayPath=[];
+
+      path.forEach((nodeId,i)=>{
+        delay+=800;
+        setTimeout(()=>{
+          const node=document.getElementById('node-'+nodeId);
+          if(node){
+            node.className='mesh-node device relaying';
+            setTimeout(()=>{
+              if(nodeId!=='HUB')node.className='mesh-node device '+(isOnline?'active':'offline-cached');
+            },600);
+          }
+          msg.relayHops=i+1;
+          msg.relayPath.push(nodeId);
+          relayCount++;
+
+          // Highlight connection lines
+          CONNECTIONS.forEach((c,ci)=>{
+            if(i>0&&((c[0]===path[i-1]&&c[1]===nodeId)||(c[1]===path[i-1]&&c[0]===nodeId))){
+              const line=document.getElementById('line-'+ci);
+              if(line){line.className='mesh-line relay';setTimeout(()=>{line.className='mesh-line '+(isOnline?'active':'dead');},1000);}
+            }
+          });
+
+          const deviceName=DEVICE_DEFS.find(d=>d.id===nodeId)?.name||nodeId;
+          addSyncLog('📡','Hop '+msg.relayHops+': '+msg.id+' relayed via '+deviceName,'#f59e0b');
+
+          if(i===path.length-1&&nodeId==='HUB'){
+            if(isOnline){
+              msg.synced=true;syncedCount++;
+              addSyncLog('✅',msg.id+' reached Hub and synced to server!','#16a34a');
+            }else{
+              addSyncLog('💾',msg.id+' cached at Hub — awaiting network restore.','#ca8a04');
+            }
+          }
+          renderCache();
+          updateStats();
+        },delay);
+      });
+    }
+
+    // Force sync
+    document.getElementById('btn-sync').addEventListener('click',()=>{
+      if(!isOnline){addSyncLog('❌','Cannot sync — network is offline!','#dc2626');return;}
+      autoSync();
+    });
+
+    function autoSync(){
+      const unsynced=cachedMessages.filter(m=>!m.synced);
+      if(unsynced.length===0){addSyncLog('ℹ️','No pending messages to sync.','#2563eb');return;}
+
+      let delay=0;
+      unsynced.forEach(msg=>{
+        delay+=500;
+        setTimeout(()=>{
+          msg.synced=true;syncedCount++;
+          addSyncLog('🔄','Synced '+msg.id+' to server ('+msg.type+')','#2563eb');
+          renderCache();updateStats();
+        },delay);
+      });
+
+      setTimeout(()=>{
+        addSyncLog('✅','All '+unsynced.length+' cached messages synced successfully!','#16a34a');
+      },delay+300);
+    }
+
+    function addSyncLog(icon,msg,color){
+      syncLog.unshift({icon,msg,color,time:new Date()});
+      const el=document.getElementById('sync-log');
+      el.innerHTML=syncLog.slice(0,30).map(l=>`<div class="sync-log"><span class="sync-time">${l.time.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span><span class="sync-msg" style="color:${l.color}">${l.icon} ${l.msg}</span></div>`).join('');
+    }
+
+    function renderCache(){
+      const el=document.getElementById('cache-list');
+      if(cachedMessages.length===0){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.78rem">No cached data</div>';return;}
+      el.innerHTML=cachedMessages.map(m=>{
+        const color=m.synced?'#16a34a':'#dc2626';
+        const label=m.synced?'SYNCED':'PENDING';
+        return`<div class="cache-item"><span class="cache-icon">${m.type==='SOS'?'🆘':'📦'}</span><div class="cache-info"><div class="cache-type">${m.id} — ${m.data.name}</div><div class="cache-meta">${m.data.urgency} · ${m.data.people} people · ${m.relayHops} hops</div></div><span class="cache-status" style="background:${color}15;color:${color}">${label}</span></div>`;
+      }).join('');
+
+      // Storage bar
+      const pct=Math.min(100,cachedMessages.length*8);
+      document.getElementById('storage-fill').style.width=pct+'%';
+      document.getElementById('storage-pct').textContent=pct+'%';
+    }
+
+    function updateStats(){
+      document.getElementById('s-cached').textContent=cachedMessages.length;
+      document.getElementById('s-synced').textContent=syncedCount;
+      document.getElementById('s-pending').textContent=cachedMessages.filter(m=>!m.synced).length;
+      document.getElementById('s-relays').textContent=relayCount;
+    }
+
+    // Load from localStorage
+    const saved=localStorage.getItem('crisisiq_offline_cache');
+    if(saved)try{cachedMessages=JSON.parse(saved);}catch(e){}
+
+    initMeshViz();
+    renderCache();
+    updateStats();
+    addSyncLog('🟢','Mesh network initialized. '+DEVICE_DEFS.length+' devices online.','#16a34a');
+  </script>
+</body>
+</html>

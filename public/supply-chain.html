@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Supply Chain Optimizer — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .sc-layout{display:grid;grid-template-columns:1fr 380px;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
+    .sc-map-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+    #sc-map{flex:1;min-height:300px}
+    .sc-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .sc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .sc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;grid-column:1/-1}
+    .sc-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;box-shadow:var(--shadow)}
+    .sc-stat-val{font-size:1.1rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .sc-stat-key{font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .route-option{padding:14px;border-bottom:1px solid var(--border);cursor:pointer;transition:all 0.2s;position:relative}
+    .route-option:hover{background:var(--bg-primary)}
+    .route-option.selected{border-left:3px solid var(--accent);background:rgba(37,99,235,0.03)}
+    .route-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .route-type{font-weight:800;font-size:0.9rem;display:flex;align-items:center;gap:6px}
+    .route-badge{padding:2px 8px;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase}
+    .route-metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+    .route-metric{text-align:center}
+    .route-metric-val{font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700}
+    .route-metric-key{font-size:0.6rem;color:var(--text-muted);text-transform:uppercase}
+    .route-details{font-size:0.7rem;color:var(--text-muted);margin-top:6px;line-height:1.5}
+    .route-waypoints{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:6px}
+    .waypoint{padding:2px 6px;border-radius:4px;font-size:0.6rem;font-weight:600;background:var(--bg-primary);border:1px solid var(--border)}
+    .form-section{padding:14px;display:flex;flex-direction:column;gap:10px}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .form-group{display:flex;flex-direction:column;gap:4px}
+    .form-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary)}
+    .form-select{border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:0.82rem;background:var(--bg-primary);color:var(--text-primary);font-family:'Inter',sans-serif}
+    .btn-optimize{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:700;cursor:pointer;width:100%;font-family:'Inter',sans-serif;transition:all 0.2s}
+    .btn-optimize:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(37,99,235,0.35)}
+    .constraint-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:14px;font-size:0.72rem;cursor:pointer;transition:all 0.2s}
+    .constraint-chip:hover{border-color:var(--accent)}
+    .constraint-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .chart-wrap{padding:14px;min-height:200px}
+    .chart-wrap canvas{max-height:220px}
+    @media(max-width:800px){.sc-layout{grid-template-columns:1fr;height:auto}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(37,99,235,0.08)">📦</div>
+        <div><div class="nav-page-title">Supply Chain Optimizer</div><div class="nav-page-sub">Multi-Route AI · Fastest · Safest · Shortest</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> ROUTING</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="sc-layout">
+    <div class="sc-map-panel">
+      <div class="card-header">🗺️ Route Visualization</div>
+      <div id="sc-map"></div>
+    </div>
+
+    <div class="sc-sidebar">
+      <div class="sc-stats">
+        <div class="sc-stat"><div class="sc-stat-val" style="color:#2563eb" id="s-routes">0</div><div class="sc-stat-key">Routes</div></div>
+        <div class="sc-stat"><div class="sc-stat-val" style="color:#16a34a" id="s-optimal">—</div><div class="sc-stat-key">Optimal</div></div>
+        <div class="sc-stat"><div class="sc-stat-val" style="color:#ea580c" id="s-blocked">0</div><div class="sc-stat-key">Blocked</div></div>
+        <div class="sc-stat"><div class="sc-stat-val" style="color:#7c3aed" id="s-saved">0%</div><div class="sc-stat-key">Time Saved</div></div>
+      </div>
+
+      <div class="sc-card">
+        <div class="card-header">⚙️ Route Configuration</div>
+        <div class="form-section">
+          <div class="form-group"><label class="form-label">Destination Zone</label><select class="form-select" id="dest-zone"></select></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Cargo Type</label><select class="form-select" id="cargo-type"><option value="food">🍱 Food Supply</option><option value="medical">🏥 Medical</option><option value="rescue">🚒 Rescue Team</option><option value="water">💧 Water</option></select></div>
+            <div class="form-group"><label class="form-label">Vehicle</label><select class="form-select" id="vehicle-type"><option value="truck">🚛 Supply Truck</option><option value="ambulance">🚑 Ambulance</option><option value="van">🚐 Relief Van</option></select></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Constraints</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <span class="constraint-chip active" data-c="avoid-blocked">🚧 Avoid Blocked</span>
+              <span class="constraint-chip" data-c="fuel-efficient">⛽ Fuel Efficient</span>
+              <span class="constraint-chip" data-c="avoid-flood">🌊 Avoid Flood</span>
+              <span class="constraint-chip" data-c="night-safe">🌙 Night Safe</span>
+            </div>
+          </div>
+          <button class="btn-optimize" id="btn-optimize">🧠 Optimize Routes</button>
+        </div>
+      </div>
+
+      <div class="sc-card">
+        <div class="card-header">🛣️ Route Options (AI Ranked)</div>
+        <div id="route-list"><div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.78rem">Configure and click "Optimize Routes"</div></div>
+      </div>
+
+      <div class="sc-card">
+        <div class="card-header">📊 Route Comparison</div>
+        <div class="chart-wrap"><canvas id="chart-compare"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const map=L.map('sc-map',{center:[13.08,80.27],zoom:12});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(map);
+    const routeLayer=L.layerGroup().addTo(map);
+
+    let zones=[];let hub=null;let routes=[];let selectedRoute=0;let compareChart=null;
+    let activeConstraints=new Set(['avoid-blocked']);
+
+    // Constraints
+    document.querySelectorAll('.constraint-chip').forEach(chip=>{
+      chip.addEventListener('click',()=>{
+        chip.classList.toggle('active');
+        if(chip.classList.contains('active'))activeConstraints.add(chip.dataset.c);
+        else activeConstraints.delete(chip.dataset.c);
+      });
+    });
+
+    async function loadZones(){
+      try{
+        const d=await(await fetch('/api/zones')).json();
+        zones=d.zones;hub=d.reliefHub;
+        const sel=document.getElementById('dest-zone');
+        zones.forEach(z=>{
+          const opt=document.createElement('option');
+          opt.value=z.id;
+          opt.textContent=z.name+' ('+z.roadAccess+')';
+          sel.appendChild(opt);
+        });
+
+        // Hub marker
+        L.marker([hub.latitude,hub.longitude],{icon:L.divIcon({className:'',html:'<div style="background:#7c3aed;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🏛️</div>',iconSize:[30,30],iconAnchor:[15,15]})}).addTo(map).bindPopup('<b>Relief Hub</b>');
+
+        // Zone markers
+        zones.forEach(z=>{
+          const color=z.severity>=8?'#dc2626':z.severity>=6?'#ea580c':z.severity>=4?'#ca8a04':'#16a34a';
+          L.circleMarker([z.latitude,z.longitude],{radius:8,fillColor:color,color:'#fff',weight:2,fillOpacity:0.8}).addTo(map)
+            .bindPopup(`<b>${z.name}</b><br>Access: ${z.roadAccess}<br>Severity: ${z.severity}/10`);
+        });
+      }catch(e){}
+    }
+    loadZones();
+
+    function haversine(lat1,lon1,lat2,lon2){
+      const R=6371;const dLat=(lat2-lat1)*Math.PI/180;const dLon=(lon2-lon1)*Math.PI/180;
+      const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+      return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+    }
+
+    document.getElementById('btn-optimize').addEventListener('click',()=>{
+      const zid=document.getElementById('dest-zone').value;
+      const z=zones.find(zn=>zn.id===zid);
+      if(!z||!hub)return;
+
+      const directDist=haversine(hub.latitude,hub.longitude,z.latitude,z.longitude);
+      const vehicle=document.getElementById('vehicle-type').value;
+      const baseSpeed=vehicle==='ambulance'?60:vehicle==='truck'?35:45;
+      const isBlocked=z.roadAccess==='blocked';
+      const isPartial=z.roadAccess==='partial';
+
+      routes=[];
+
+      // Route 1: Fastest (direct, may go through risky areas)
+      const fastDist=directDist*1.1;
+      const fastSpeed=baseSpeed*1.2;
+      const fastTime=Math.ceil(fastDist/fastSpeed*60);
+      const fastFuel=Math.round(fastDist*0.12);
+      const fastRisk=isBlocked?85:isPartial?50:20;
+      routes.push({
+        name:'⚡ Fastest Route',type:'fastest',
+        distance:parseFloat(fastDist.toFixed(1)),time:fastTime,fuel:fastFuel,
+        risk:fastRisk,speed:Math.round(fastSpeed),
+        color:'#2563eb',recommended:!isBlocked&&!activeConstraints.has('avoid-blocked'),
+        waypoints:['Hub','Highway NH-48','Express Corridor',z.name.split(' ').slice(0,2).join(' ')],
+        details:isBlocked?'⚠️ Route passes through blocked zone — risky':'Direct highway route with minimal stops'
+      });
+
+      // Route 2: Safest (avoids all blocked/flood zones)
+      const safeDist=directDist*1.6;
+      const safeSpeed=baseSpeed*0.8;
+      const safeTime=Math.ceil(safeDist/safeSpeed*60);
+      const safeFuel=Math.round(safeDist*0.14);
+      routes.push({
+        name:'🛡️ Safest Route',type:'safest',
+        distance:parseFloat(safeDist.toFixed(1)),time:safeTime,fuel:safeFuel,
+        risk:10,speed:Math.round(safeSpeed),
+        color:'#16a34a',recommended:isBlocked||activeConstraints.has('avoid-blocked'),
+        waypoints:['Hub','Service Road','Bypass Ring','Alt Bridge',z.name.split(' ').slice(0,2).join(' ')],
+        details:'Avoids all blocked/flood-prone areas. Longer but zero-risk.'
+      });
+
+      // Route 3: Shortest (minimum distance, may be slow)
+      const shortDist=directDist*0.95;
+      const shortSpeed=baseSpeed*(isBlocked?0.3:isPartial?0.6:0.9);
+      const shortTime=Math.ceil(shortDist/shortSpeed*60);
+      const shortFuel=Math.round(shortDist*0.1);
+      const shortRisk=isBlocked?95:isPartial?60:15;
+      routes.push({
+        name:'📏 Shortest Route',type:'shortest',
+        distance:parseFloat(shortDist.toFixed(1)),time:shortTime,fuel:shortFuel,
+        risk:shortRisk,speed:Math.round(shortSpeed),
+        color:'#f59e0b',recommended:false,
+        waypoints:['Hub','Inner Road',z.name.split(' ').slice(0,2).join(' ')],
+        details:'Minimum distance but may encounter road damage or congestion.'
+      });
+
+      // Route 4: Balanced (AI-optimized)
+      const balDist=directDist*1.3;
+      const balSpeed=baseSpeed*1.0;
+      const balTime=Math.ceil(balDist/balSpeed*60);
+      const balFuel=Math.round(balDist*0.11);
+      const balRisk=isBlocked?30:15;
+      routes.push({
+        name:'🧠 AI Balanced',type:'balanced',
+        distance:parseFloat(balDist.toFixed(1)),time:balTime,fuel:balFuel,
+        risk:balRisk,speed:Math.round(balSpeed),
+        color:'#7c3aed',recommended:!routes.find(r=>r.recommended),
+        waypoints:['Hub','Checked Corridor','Verified Bridge','Safe Junction',z.name.split(' ').slice(0,2).join(' ')],
+        details:'AI-optimized balance of speed, safety, and fuel efficiency.'
+      });
+
+      // Ensure exactly one recommended
+      if(!routes.find(r=>r.recommended))routes[3].recommended=true;
+
+      selectedRoute=routes.findIndex(r=>r.recommended);
+      renderRoutes();
+      drawRouteOnMap(z);
+      renderChart();
+      updateStats(z);
+    });
+
+    function renderRoutes(){
+      document.getElementById('route-list').innerHTML=routes.map((r,i)=>{
+        const riskColor=r.risk>60?'#dc2626':r.risk>30?'#ea580c':'#16a34a';
+        return`<div class="route-option${i===selectedRoute?' selected':''}" onclick="selectRoute(${i})">
+          <div class="route-header">
+            <span class="route-type" style="color:${r.color}">${r.name}</span>
+            ${r.recommended?'<span class="route-badge" style="background:#16a34a15;color:#16a34a">✅ RECOMMENDED</span>':''}
+          </div>
+          <div class="route-metrics">
+            <div class="route-metric"><div class="route-metric-val" style="color:${r.color}">${r.distance}km</div><div class="route-metric-key">Distance</div></div>
+            <div class="route-metric"><div class="route-metric-val">${r.time}min</div><div class="route-metric-key">ETA</div></div>
+            <div class="route-metric"><div class="route-metric-val" style="color:${riskColor}">${r.risk}%</div><div class="route-metric-key">Risk</div></div>
+          </div>
+          <div class="route-details">⛽ ${r.fuel}L fuel · 🚗 ${r.speed}km/h avg · ${r.details}</div>
+          <div class="route-waypoints">${r.waypoints.map(w=>'<span class="waypoint">'+w+'</span>').join('<span style="color:var(--text-muted)">→</span>')}</div>
+        </div>`;
+      }).join('');
+      document.getElementById('s-routes').textContent=routes.length;
+    }
+
+    window.selectRoute=function(i){
+      selectedRoute=i;
+      renderRoutes();
+      const zid=document.getElementById('dest-zone').value;
+      const z=zones.find(zn=>zn.id===zid);
+      if(z)drawRouteOnMap(z);
+    };
+
+    function drawRouteOnMap(z){
+      routeLayer.clearLayers();
+      routes.forEach((r,i)=>{
+        const isSelected=i===selectedRoute;
+        // Generate waypoints (curved paths)
+        const pts=generateCurvedPath(hub.latitude,hub.longitude,z.latitude,z.longitude,r.type);
+        L.polyline(pts,{
+          color:r.color,weight:isSelected?5:2,opacity:isSelected?0.9:0.3,
+          dashArray:isSelected?'':'8,8'
+        }).addTo(routeLayer).bindPopup(`<b>${r.name}</b><br>${r.distance}km · ${r.time}min · Risk: ${r.risk}%`);
+      });
+    }
+
+    function generateCurvedPath(lat1,lon1,lat2,lon2,type){
+      const pts=[];const steps=20;
+      for(let i=0;i<=steps;i++){
+        const t=i/steps;
+        let offsetLat=0,offsetLon=0;
+        if(type==='safest'){offsetLat=Math.sin(t*Math.PI)*0.015;offsetLon=Math.cos(t*Math.PI)*0.02;}
+        else if(type==='shortest'){offsetLat=Math.sin(t*Math.PI)*-0.003;offsetLon=0;}
+        else if(type==='balanced'){offsetLat=Math.sin(t*Math.PI)*0.008;offsetLon=Math.sin(t*Math.PI)*-0.005;}
+        else{offsetLat=Math.sin(t*Math.PI)*0.005;offsetLon=Math.cos(t*Math.PI)*0.008;}
+        pts.push([lat1+(lat2-lat1)*t+offsetLat,lon1+(lon2-lon1)*t+offsetLon]);
+      }
+      return pts;
+    }
+
+    function renderChart(){
+      if(compareChart)compareChart.destroy();
+      compareChart=new Chart(document.getElementById('chart-compare'),{type:'bar',
+        data:{labels:routes.map(r=>r.type.charAt(0).toUpperCase()+r.type.slice(1)),
+          datasets:[
+            {label:'Time (min)',data:routes.map(r=>r.time),backgroundColor:routes.map(r=>r.color+'80')},
+            {label:'Risk %',data:routes.map(r=>r.risk),backgroundColor:'#dc262640'}
+          ]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{family:'Inter',size:10}}}},
+          scales:{y:{beginAtZero:true}}}
+      });
+    }
+
+    function updateStats(z){
+      const best=routes[selectedRoute];
+      const worst=routes.reduce((a,b)=>a.time>b.time?a:b);
+      const saved=Math.round((1-best.time/worst.time)*100);
+      document.getElementById('s-optimal').textContent=best.type;
+      document.getElementById('s-blocked').textContent=zones.filter(zn=>zn.roadAccess==='blocked').length;
+      document.getElementById('s-saved').textContent=saved+'%';
+    }
+
+    // Auto-optimize on load
+    setTimeout(()=>{document.getElementById('btn-optimize').click();},1500);
+  </script>
+</body>
+</html>

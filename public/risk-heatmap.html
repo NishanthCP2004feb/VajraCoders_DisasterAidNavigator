@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Risk Heatmap — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .hm-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
+    .hm-map-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+    #hm-map{flex:1;min-height:300px}
+    .hm-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .hm-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .hm-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .hm-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;box-shadow:var(--shadow)}
+    .hm-stat-val{font-size:1.2rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .hm-stat-key{font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .layer-toggle{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;font-size:0.82rem}
+    .layer-toggle:hover{background:var(--bg-primary)}
+    .layer-toggle input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+    .layer-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .layer-name{flex:1;font-weight:600}
+    .layer-count{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text-muted)}
+    .slider-group{padding:10px 14px;border-bottom:1px solid var(--border)}
+    .slider-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);display:flex;justify-content:space-between;margin-bottom:4px}
+    .slider-input{width:100%;accent-color:var(--accent);cursor:pointer}
+    .legend-bar{height:12px;border-radius:6px;background:linear-gradient(90deg,#16a34a,#84cc16,#eab308,#f97316,#dc2626);margin:8px 14px}
+    .legend-labels{display:flex;justify-content:space-between;padding:0 14px 10px;font-size:0.62rem;color:var(--text-muted)}
+    .zone-risk-item{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .zone-risk-name{flex:1;font-weight:600}
+    .zone-risk-score{font-family:'JetBrains Mono',monospace;font-weight:700;width:40px;text-align:right}
+    .zone-risk-bar{width:60px;height:6px;background:var(--bg-primary);border-radius:3px;overflow:hidden}
+    .zone-risk-fill{height:100%;border-radius:3px}
+    .cluster-info{padding:12px 14px;font-size:0.72rem;color:var(--text-secondary);line-height:1.6}
+    .btn-refresh{background:linear-gradient(135deg,#ea580c,#dc2626);color:#fff;border:none;border-radius:8px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer;width:100%;font-family:'Inter',sans-serif;transition:all 0.2s;margin:10px 14px;width:calc(100% - 28px)}
+    .btn-refresh:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(220,38,38,0.3)}
+    .pulse-ring{position:absolute;border:2px solid rgba(220,38,38,0.4);border-radius:50%;animation:pulse-ring-anim 2s infinite}
+    @keyframes pulse-ring-anim{0%{width:20px;height:20px;opacity:1}100%{width:60px;height:60px;opacity:0}}
+    @media(max-width:800px){.hm-layout{grid-template-columns:1fr;height:auto}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(234,88,12,0.08)">📊</div>
+        <div><div class="nav-page-title">Dynamic Risk Heatmap</div><div class="nav-page-sub">Population Density · SOS Clustering · Severity Intensity</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> LIVE</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="hm-layout">
+    <div class="hm-map-wrap">
+      <div class="card-header">🗺️ Multi-Layer Risk Heatmap</div>
+      <div id="hm-map"></div>
+    </div>
+
+    <div class="hm-sidebar">
+      <div class="hm-stats">
+        <div class="hm-stat"><div class="hm-stat-val" style="color:#dc2626" id="s-hotspots">0</div><div class="hm-stat-key">Hotspots</div></div>
+        <div class="hm-stat"><div class="hm-stat-val" style="color:#ea580c" id="s-risk">0%</div><div class="hm-stat-key">Avg Risk</div></div>
+        <div class="hm-stat"><div class="hm-stat-val" style="color:#7c3aed" id="s-population">0</div><div class="hm-stat-key">At Risk Pop.</div></div>
+        <div class="hm-stat"><div class="hm-stat-val" style="color:#0891b2" id="s-density">0</div><div class="hm-stat-key">Data Points</div></div>
+      </div>
+
+      <div class="hm-card">
+        <div class="card-header">🎚️ Heatmap Layers</div>
+        <label class="layer-toggle"><input type="checkbox" id="lyr-severity" checked/><span class="layer-dot" style="background:#dc2626"></span><span class="layer-name">Severity Risk</span><span class="layer-count" id="cnt-severity">0</span></label>
+        <label class="layer-toggle"><input type="checkbox" id="lyr-population" checked/><span class="layer-dot" style="background:#7c3aed"></span><span class="layer-name">Population Density</span><span class="layer-count" id="cnt-population">0</span></label>
+        <label class="layer-toggle"><input type="checkbox" id="lyr-sos"/><span class="layer-dot" style="background:#f59e0b"></span><span class="layer-name">SOS Beacon Clusters</span><span class="layer-count" id="cnt-sos">0</span></label>
+        <label class="layer-toggle"><input type="checkbox" id="lyr-medical"/><span class="layer-dot" style="background:#2563eb"></span><span class="layer-name">Medical Urgency</span><span class="layer-count" id="cnt-medical">0</span></label>
+        <label class="layer-toggle"><input type="checkbox" id="lyr-access"/><span class="layer-dot" style="background:#16a34a"></span><span class="layer-name">Access Difficulty</span><span class="layer-count" id="cnt-access">0</span></label>
+      </div>
+
+      <div class="hm-card">
+        <div class="card-header">⚙️ Heatmap Settings</div>
+        <div class="slider-group">
+          <div class="slider-label"><span>Radius</span><span id="val-radius">25</span></div>
+          <input type="range" class="slider-input" id="sl-radius" min="10" max="60" value="25"/>
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>Blur</span><span id="val-blur">15</span></div>
+          <input type="range" class="slider-input" id="sl-blur" min="5" max="40" value="15"/>
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>Max Intensity</span><span id="val-intensity">1.0</span></div>
+          <input type="range" class="slider-input" id="sl-intensity" min="1" max="20" value="10"/>
+        </div>
+        <div class="legend-bar"></div>
+        <div class="legend-labels"><span>Low Risk</span><span>Moderate</span><span>High</span><span>Critical</span></div>
+      </div>
+
+      <div class="hm-card">
+        <div class="card-header">📋 Zone Risk Rankings</div>
+        <div id="zone-risk-list"></div>
+      </div>
+
+      <button class="btn-refresh" id="btn-refresh">🔄 Regenerate Heatmap Data</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    const map=L.map('hm-map',{center:[13.08,80.27],zoom:11});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© CartoDB',maxZoom:19}).addTo(map);
+
+    let zones=[];let heatLayers={};let heatData={};
+
+    // Layer configs
+    const LAYERS={
+      severity:{color:'#dc2626',gradient:{0.2:'#16a34a',0.4:'#84cc16',0.6:'#eab308',0.8:'#f97316',1:'#dc2626'}},
+      population:{color:'#7c3aed',gradient:{0.2:'#818cf8',0.4:'#a78bfa',0.6:'#8b5cf6',0.8:'#7c3aed',1:'#6d28d9'}},
+      sos:{color:'#f59e0b',gradient:{0.2:'#fde68a',0.4:'#fbbf24',0.6:'#f59e0b',0.8:'#d97706',1:'#b45309'}},
+      medical:{color:'#2563eb',gradient:{0.2:'#93c5fd',0.4:'#60a5fa',0.6:'#3b82f6',0.8:'#2563eb',1:'#1d4ed8'}},
+      access:{color:'#16a34a',gradient:{0.2:'#bbf7d0',0.4:'#86efac',0.6:'#4ade80',0.8:'#16a34a',1:'#15803d'}}
+    };
+
+    async function loadData(){
+      try{
+        const d=await(await fetch('/api/zones')).json();
+        zones=d.zones;
+        generateHeatData();
+        renderLayers();
+        renderZoneRanking();
+        updateStats();
+      }catch(e){console.error(e);}
+    }
+
+    function generateHeatData(){
+      heatData={severity:[],population:[],sos:[],medical:[],access:[]};
+
+      zones.forEach(z=>{
+        const lat=z.latitude,lng=z.longitude;
+        // Severity - main risk heatmap
+        const sevIntensity=z.severity/10;
+        for(let i=0;i<20;i++){
+          const jLat=lat+(Math.random()-0.5)*0.03;
+          const jLng=lng+(Math.random()-0.5)*0.03;
+          heatData.severity.push([jLat,jLng,sevIntensity*(0.6+Math.random()*0.4)]);
+        }
+
+        // Population density
+        const popIntensity=Math.min(1,z.population/10000);
+        for(let i=0;i<Math.ceil(popIntensity*15);i++){
+          const jLat=lat+(Math.random()-0.5)*0.025;
+          const jLng=lng+(Math.random()-0.5)*0.025;
+          heatData.population.push([jLat,jLng,popIntensity*(0.5+Math.random()*0.5)]);
+        }
+
+        // SOS clustering (simulated around high severity zones)
+        if(z.severity>=6){
+          const sosCnt=Math.ceil(z.severity*1.5);
+          for(let i=0;i<sosCnt;i++){
+            const jLat=lat+(Math.random()-0.5)*0.02;
+            const jLng=lng+(Math.random()-0.5)*0.02;
+            heatData.sos.push([jLat,jLng,0.5+Math.random()*0.5]);
+          }
+        }
+
+        // Medical urgency
+        const medIntensity=(z.medicalCases||0)/50;
+        for(let i=0;i<Math.max(5,Math.ceil(medIntensity*12));i++){
+          const jLat=lat+(Math.random()-0.5)*0.02;
+          const jLng=lng+(Math.random()-0.5)*0.02;
+          heatData.medical.push([jLat,jLng,Math.min(1,medIntensity*(0.4+Math.random()*0.6))]);
+        }
+
+        // Access difficulty
+        const accessMap={blocked:1.0,partial:0.6,open:0.2};
+        const accIntensity=accessMap[z.roadAccess]||0.3;
+        for(let i=0;i<10;i++){
+          const jLat=lat+(Math.random()-0.5)*0.035;
+          const jLng=lng+(Math.random()-0.5)*0.035;
+          heatData.access.push([jLat,jLng,accIntensity*(0.5+Math.random()*0.5)]);
+        }
+      });
+
+      // Update counts
+      document.getElementById('cnt-severity').textContent=heatData.severity.length+' pts';
+      document.getElementById('cnt-population').textContent=heatData.population.length+' pts';
+      document.getElementById('cnt-sos').textContent=heatData.sos.length+' pts';
+      document.getElementById('cnt-medical').textContent=heatData.medical.length+' pts';
+      document.getElementById('cnt-access').textContent=heatData.access.length+' pts';
+    }
+
+    function renderLayers(){
+      const radius=parseInt(document.getElementById('sl-radius').value);
+      const blur=parseInt(document.getElementById('sl-blur').value);
+      const maxVal=parseInt(document.getElementById('sl-intensity').value)/10;
+
+      // Remove existing layers
+      Object.values(heatLayers).forEach(l=>{if(map.hasLayer(l))map.removeLayer(l);});
+      heatLayers={};
+
+      // Add active layers
+      Object.keys(LAYERS).forEach(key=>{
+        const cb=document.getElementById('lyr-'+key);
+        if(cb&&cb.checked&&heatData[key]&&heatData[key].length>0){
+          heatLayers[key]=L.heatLayer(heatData[key],{
+            radius,blur,maxZoom:17,max:maxVal,
+            gradient:LAYERS[key].gradient
+          }).addTo(map);
+        }
+      });
+
+      // Add zone markers on top
+      zones.forEach(z=>{
+        const color=z.severity>=8?'#dc2626':z.severity>=6?'#ea580c':z.severity>=4?'#ca8a04':'#16a34a';
+        L.circleMarker([z.latitude,z.longitude],{radius:6,fillColor:color,color:'#fff',weight:2,fillOpacity:0.9})
+          .addTo(map)
+          .bindPopup(`<b style="color:${color}">${z.name}</b><br>Severity: ${z.severity}/10<br>Population: ${z.population.toLocaleString()}<br>Access: ${z.roadAccess}`);
+      });
+    }
+
+    function renderZoneRanking(){
+      const ranked=[...zones].sort((a,b)=>b.severity-a.severity);
+      document.getElementById('zone-risk-list').innerHTML=ranked.map(z=>{
+        const pct=z.severity*10;
+        const color=z.severity>=8?'#dc2626':z.severity>=6?'#ea580c':z.severity>=4?'#ca8a04':'#16a34a';
+        return`<div class="zone-risk-item"><span class="zone-risk-name">${z.name}</span><div class="zone-risk-bar"><div class="zone-risk-fill" style="width:${pct}%;background:${color}"></div></div><span class="zone-risk-score" style="color:${color}">${z.severity}</span></div>`;
+      }).join('');
+    }
+
+    function updateStats(){
+      const hotspots=zones.filter(z=>z.severity>=7).length;
+      const avgRisk=Math.round(zones.reduce((s,z)=>s+z.severity,0)/zones.length*10);
+      const atRisk=zones.filter(z=>z.severity>=6).reduce((s,z)=>s+z.population,0);
+      const totalPts=Object.values(heatData).reduce((s,arr)=>s+arr.length,0);
+
+      document.getElementById('s-hotspots').textContent=hotspots;
+      document.getElementById('s-risk').textContent=avgRisk+'%';
+      document.getElementById('s-population').textContent=atRisk.toLocaleString();
+      document.getElementById('s-density').textContent=totalPts;
+    }
+
+    // Event listeners
+    ['lyr-severity','lyr-population','lyr-sos','lyr-medical','lyr-access'].forEach(id=>{
+      document.getElementById(id).addEventListener('change',renderLayers);
+    });
+
+    ['sl-radius','sl-blur','sl-intensity'].forEach(id=>{
+      document.getElementById(id).addEventListener('input',e=>{
+        const label=id.replace('sl-','val-');
+        document.getElementById(label).textContent=id==='sl-intensity'?(e.target.value/10).toFixed(1):e.target.value;
+        renderLayers();
+      });
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click',()=>{
+      map.eachLayer(l=>{if(l!==map._layers[Object.keys(map._layers)[0]])map.removeLayer(l);});
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+      generateHeatData();
+      renderLayers();
+      updateStats();
+    });
+
+    loadData();
+  </script>
+</body>
+</html>

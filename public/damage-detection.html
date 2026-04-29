@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Damage Detection — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .det-layout{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 20px;max-width:1400px;margin:0 auto}
+    .det-full{grid-column:1/-1}
+    .det-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;grid-column:1/-1}
+    .d-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow)}
+    .d-stat-val{font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .d-stat-key{font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .det-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all 0.3s;margin:14px;position:relative}
+    .upload-zone:hover{border-color:var(--accent);background:rgba(37,99,235,0.02)}
+    .upload-zone.dragover{border-color:var(--accent);background:rgba(37,99,235,0.05);transform:scale(1.01)}
+    .upload-icon{font-size:2.5rem;margin-bottom:10px}
+    .upload-text{font-size:0.85rem;font-weight:600;color:var(--text-primary)}
+    .upload-sub{font-size:0.72rem;color:var(--text-muted);margin-top:4px}
+    .upload-input{position:absolute;inset:0;opacity:0;cursor:pointer}
+    .image-preview{margin:14px;border-radius:10px;overflow:hidden;position:relative;background:#000;min-height:200px;display:none}
+    .image-preview img{width:100%;display:block}
+    .image-preview canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+    .detection-overlay{position:absolute;border:2px solid;border-radius:4px;display:flex;align-items:flex-start;justify-content:flex-start;font-size:0.6rem;font-weight:700;padding:2px 4px;animation:det-in 0.5s ease}
+    @keyframes det-in{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
+    .analysis-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .analysis-label{flex:1;font-weight:600}
+    .analysis-meter{width:120px;height:8px;background:var(--bg-primary);border-radius:4px;overflow:hidden}
+    .analysis-fill{height:100%;border-radius:4px;transition:width 0.8s}
+    .analysis-pct{font-family:'JetBrains Mono',monospace;font-weight:700;width:40px;text-align:right;font-size:0.78rem}
+    .finding-item{padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem;animation:det-in 0.4s ease}
+    .finding-header{display:flex;align-items:center;justify-content:space-between}
+    .finding-type{font-weight:700;display:flex;align-items:center;gap:6px}
+    .finding-confidence{font-family:'JetBrains Mono',monospace;font-size:0.72rem;padding:2px 6px;border-radius:4px}
+    .finding-desc{font-size:0.72rem;color:var(--text-muted);margin-top:4px}
+    .btn-analyze{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:700;cursor:pointer;width:calc(100% - 28px);margin:14px;font-family:'Inter',sans-serif;transition:all 0.2s}
+    .btn-analyze:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(124,58,237,0.35)}
+    .btn-analyze:disabled{opacity:0.4;cursor:default;transform:none}
+    .demo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px}
+    .demo-thumb{border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:all 0.2s;height:80px;display:flex;align-items:center;justify-content:center;font-size:2rem;background:var(--bg-primary)}
+    .demo-thumb:hover{border-color:var(--accent);transform:scale(1.03)}
+    .demo-thumb.selected{border-color:var(--accent);box-shadow:0 0 12px rgba(37,99,235,0.3)}
+    .demo-label{font-size:0.62rem;text-align:center;margin-top:4px;color:var(--text-muted);font-weight:600}
+    .progress-scan{height:4px;background:var(--bg-primary);overflow:hidden;display:none}
+    .progress-scan-bar{height:100%;background:linear-gradient(90deg,#7c3aed,#2563eb);width:0%;transition:width 3s linear}
+    .chart-wrap{padding:14px;min-height:220px}
+    .chart-wrap canvas{max-height:240px}
+    @media(max-width:900px){.det-layout{grid-template-columns:1fr}.det-stats{grid-template-columns:repeat(3,1fr)}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(124,58,237,0.08)">🛰️</div>
+        <div><div class="nav-page-title">AI Damage Detection</div><div class="nav-page-sub">Computer Vision · Satellite Image Analysis</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot"></span> AI READY</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="det-layout">
+    <div class="det-stats">
+      <div class="d-stat"><div class="d-stat-val" style="color:#dc2626" id="s-damaged">0</div><div class="d-stat-key">Damage Zones</div></div>
+      <div class="d-stat"><div class="d-stat-val" style="color:#ea580c" id="s-flooded">0</div><div class="d-stat-key">Flood Areas</div></div>
+      <div class="d-stat"><div class="d-stat-val" style="color:#7c3aed" id="s-buildings">0</div><div class="d-stat-key">Structures Hit</div></div>
+      <div class="d-stat"><div class="d-stat-val" style="color:#16a34a" id="s-confidence">0%</div><div class="d-stat-key">AI Confidence</div></div>
+      <div class="d-stat"><div class="d-stat-val" style="color:#2563eb" id="s-scans">0</div><div class="d-stat-key">Scans Done</div></div>
+    </div>
+
+    <div class="det-card">
+      <div class="card-header">📸 Image Input</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" class="upload-input" id="file-input" accept="image/*"/>
+        <div class="upload-icon">📂</div>
+        <div class="upload-text">Drop satellite image or click to upload</div>
+        <div class="upload-sub">Supports JPG, PNG · Max 10MB</div>
+      </div>
+      <div style="padding:0 14px;font-size:0.75rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Or select a demo scenario:</div>
+      <div class="demo-grid" id="demo-grid">
+        <div><div class="demo-thumb" data-demo="flood">🌊</div><div class="demo-label">Flood</div></div>
+        <div><div class="demo-thumb" data-demo="earthquake">🏚️</div><div class="demo-label">Earthquake</div></div>
+        <div><div class="demo-thumb" data-demo="fire">🔥</div><div class="demo-label">Wildfire</div></div>
+        <div><div class="demo-thumb" data-demo="cyclone">🌀</div><div class="demo-label">Cyclone</div></div>
+        <div><div class="demo-thumb" data-demo="landslide">⛰️</div><div class="demo-label">Landslide</div></div>
+        <div><div class="demo-thumb" data-demo="tsunami">🌊</div><div class="demo-label">Tsunami</div></div>
+      </div>
+      <div class="progress-scan" id="progress-scan"><div class="progress-scan-bar" id="progress-bar"></div></div>
+      <button class="btn-analyze" id="btn-analyze" disabled>🧠 Run AI Analysis</button>
+    </div>
+
+    <div class="det-card">
+      <div class="card-header">🔍 Detection Results</div>
+      <div class="image-preview" id="image-preview"><canvas id="overlay-canvas"></canvas></div>
+      <div id="analysis-bars"></div>
+    </div>
+
+    <div class="det-card">
+      <div class="card-header">📋 AI Findings</div>
+      <div id="findings-list" style="max-height:300px;overflow-y:auto"><div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.78rem">No analysis performed yet</div></div>
+    </div>
+
+    <div class="det-card">
+      <div class="card-header">📊 Damage Distribution</div>
+      <div class="chart-wrap"><canvas id="chart-damage"></canvas></div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    let selectedDemo=null;let uploadedFile=null;let scansCount=0;let damageChart=null;
+
+    // Demo scenarios
+    const SCENARIOS={
+      flood:{
+        name:'Flood Zone Analysis',
+        analyses:[
+          {label:'Flood Water Coverage',pct:72,color:'#2563eb'},
+          {label:'Structural Damage',pct:35,color:'#ea580c'},
+          {label:'Road Submersion',pct:65,color:'#dc2626'},
+          {label:'Agricultural Loss',pct:80,color:'#16a34a'},
+          {label:'Infrastructure Impact',pct:45,color:'#7c3aed'}
+        ],
+        findings:[
+          {icon:'🌊',type:'Flooding Detected',confidence:94,color:'#2563eb',desc:'Large-scale inundation covering approx. 4.2 sq km. Water depth estimated 1.5-3m in low-lying areas.'},
+          {icon:'🏚️',type:'Building Damage',confidence:87,color:'#ea580c',desc:'23 structures identified with partial to major flood damage. 8 buildings fully submerged.'},
+          {icon:'🛣️',type:'Road Blocked',confidence:91,color:'#dc2626',desc:'3 major road segments completely submerged. 5 bridges at risk of structural failure.'},
+          {icon:'🌾',type:'Crop Destruction',confidence:82,color:'#16a34a',desc:'Approx. 180 hectares of paddy fields submerged. Estimated crop loss: 85%.'},
+          {icon:'⚡',type:'Power Grid Down',confidence:76,color:'#ca8a04',desc:'2 electrical substations identified in flood zone. Grid outage likely.'}
+        ],
+        damages:{destroyed:8,major:15,minor:23,flooded:45,fires:0}
+      },
+      earthquake:{
+        name:'Earthquake Damage Assessment',
+        analyses:[
+          {label:'Building Collapse',pct:55,color:'#dc2626'},
+          {label:'Ground Fractures',pct:40,color:'#ea580c'},
+          {label:'Road Damage',pct:60,color:'#ca8a04'},
+          {label:'Debris Coverage',pct:70,color:'#7c3aed'},
+          {label:'Structural Stress',pct:45,color:'#2563eb'}
+        ],
+        findings:[
+          {icon:'🏚️',type:'Collapsed Structures',confidence:96,color:'#dc2626',desc:'12 buildings identified as fully collapsed. Heavy debris field spanning 800m radius.'},
+          {icon:'⚠️',type:'Ground Fissures',confidence:88,color:'#ea580c',desc:'Multiple ground fractures detected along fault line. Maximum crack width: ~0.5m.'},
+          {icon:'🛣️',type:'Road Fractures',confidence:92,color:'#ca8a04',desc:'4 road segments with severe cracking. Bridge approach on NH-48 shifted 15cm.'},
+          {icon:'🏥',type:'Hospital Damage',confidence:79,color:'#7c3aed',desc:'District hospital shows wall cracks. Partial evacuation recommended.'},
+          {icon:'💧',type:'Water Main Break',confidence:84,color:'#2563eb',desc:'Underground water pipeline rupture detected. Flooding at intersection.'}
+        ],
+        damages:{destroyed:12,major:25,minor:40,flooded:5,fires:3}
+      },
+      fire:{
+        name:'Wildfire Spread Analysis',
+        analyses:[
+          {label:'Active Fire Zones',pct:45,color:'#dc2626'},
+          {label:'Burn Area',pct:62,color:'#ea580c'},
+          {label:'Smoke Coverage',pct:85,color:'#6b7280'},
+          {label:'Vegetation Loss',pct:70,color:'#16a34a'},
+          {label:'Structure Threat',pct:30,color:'#7c3aed'}
+        ],
+        findings:[
+          {icon:'🔥',type:'Active Fire Front',confidence:97,color:'#dc2626',desc:'Active wildfire front spanning 3.2km. Moving NE at ~12km/h. Temperature: 800°C+.'},
+          {icon:'🌳',type:'Forest Destruction',confidence:93,color:'#ea580c',desc:'Estimated 450 hectares of forest burned. Canopy loss: 75% in affected area.'},
+          {icon:'💨',type:'Smoke Plume',confidence:89,color:'#6b7280',desc:'Dense smoke column reaching 2km altitude. Air quality index: Hazardous (>300).'},
+          {icon:'🏠',type:'Structures at Risk',confidence:81,color:'#ca8a04',desc:'14 residential structures within 500m of fire front. Immediate evacuation needed.'},
+          {icon:'🚒',type:'Access Routes',confidence:85,color:'#2563eb',desc:'2 approach roads blocked by fallen trees. Only northern access viable for trucks.'}
+        ],
+        damages:{destroyed:6,major:8,minor:14,flooded:0,fires:45}
+      },
+      cyclone:{
+        name:'Cyclone Impact Assessment',
+        analyses:[
+          {label:'Wind Damage',pct:68,color:'#2563eb'},
+          {label:'Storm Surge',pct:55,color:'#0891b2'},
+          {label:'Roof Loss',pct:50,color:'#ea580c'},
+          {label:'Tree Fall',pct:75,color:'#16a34a'},
+          {label:'Debris Scatter',pct:60,color:'#7c3aed'}
+        ],
+        findings:[
+          {icon:'🌀',type:'Severe Wind Damage',confidence:95,color:'#2563eb',desc:'Sustained winds of 140km/h caused widespread structural damage across 6 sq km.'},
+          {icon:'🏠',type:'Roof Destruction',confidence:90,color:'#ea580c',desc:'38 buildings with partial or complete roof loss. Sheet metal debris across roads.'},
+          {icon:'🌊',type:'Storm Surge',confidence:86,color:'#0891b2',desc:'Coastal surge of 2.8m detected. 1.2km inland penetration.'},
+          {icon:'🌳',type:'Fallen Trees',confidence:92,color:'#16a34a',desc:'Approx. 200 trees uprooted. 12 blocking major roads.'},
+          {icon:'⚡',type:'Power Lines Down',confidence:88,color:'#dc2626',desc:'15+ power line segments collapsed. Electrocution hazard in 3 zones.'}
+        ],
+        damages:{destroyed:10,major:28,minor:38,flooded:25,fires:2}
+      },
+      landslide:{
+        name:'Landslide Zone Detection',
+        analyses:[
+          {label:'Slide Coverage',pct:48,color:'#ea580c'},
+          {label:'Debris Flow',pct:55,color:'#ca8a04'},
+          {label:'Road Burial',pct:70,color:'#dc2626'},
+          {label:'Soil Instability',pct:62,color:'#7c3aed'},
+          {label:'Building Burial',pct:25,color:'#2563eb'}
+        ],
+        findings:[
+          {icon:'⛰️',type:'Major Landslide',confidence:94,color:'#ea580c',desc:'Hillside collapse covering 0.8 sq km. Debris depth: 3-5m in impact zone.'},
+          {icon:'🛣️',type:'Road Completely Buried',confidence:96,color:'#dc2626',desc:'NH-45 segment buried under 4m of mud/rock. Estimated clearing time: 72+ hours.'},
+          {icon:'🏠',type:'Buried Structures',confidence:82,color:'#7c3aed',desc:'4 buildings partially buried. Search & rescue operation required.'},
+          {icon:'⚠️',type:'Secondary Slide Risk',confidence:78,color:'#ca8a04',desc:'Adjacent hillside showing instability. 60% probability of secondary slide.'},
+          {icon:'💧',type:'River Damming',confidence:73,color:'#2563eb',desc:'Debris has partially dammed river. Upstream flooding risk within 12 hours.'}
+        ],
+        damages:{destroyed:4,major:6,minor:12,flooded:8,fires:0}
+      },
+      tsunami:{
+        name:'Tsunami Impact Analysis',
+        analyses:[
+          {label:'Wave Impact Zone',pct:80,color:'#0891b2'},
+          {label:'Coastal Erosion',pct:65,color:'#ca8a04'},
+          {label:'Inland Penetration',pct:50,color:'#2563eb'},
+          {label:'Debris Field',pct:72,color:'#7c3aed'},
+          {label:'Structural Loss',pct:55,color:'#dc2626'}
+        ],
+        findings:[
+          {icon:'🌊',type:'Tsunami Wave Impact',confidence:97,color:'#0891b2',desc:'Wave height estimated 5-8m. Inland penetration up to 2km from coastline.'},
+          {icon:'🏚️',type:'Coastal Destruction',confidence:94,color:'#dc2626',desc:'All structures within 500m of coast severely damaged or destroyed.'},
+          {icon:'🚗',type:'Vehicle Displacement',confidence:88,color:'#ea580c',desc:'Hundreds of vehicles displaced and scattered. Major road hazard.'},
+          {icon:'🏖️',type:'Coastline Changed',confidence:91,color:'#ca8a04',desc:'Significant coastal erosion. Beach moved 50-80m inland.'},
+          {icon:'⚡',type:'Complete Infrastructure Loss',confidence:86,color:'#7c3aed',desc:'Power, water, and communication lines destroyed in coastal zone.'}
+        ],
+        damages:{destroyed:45,major:30,minor:15,flooded:60,fires:1}
+      }
+    };
+
+    // Demo selection
+    document.getElementById('demo-grid').addEventListener('click',e=>{
+      const thumb=e.target.closest('.demo-thumb');
+      if(!thumb)return;
+      document.querySelectorAll('.demo-thumb').forEach(t=>t.classList.remove('selected'));
+      thumb.classList.add('selected');
+      selectedDemo=thumb.dataset.demo;
+      uploadedFile=null;
+      document.getElementById('btn-analyze').disabled=false;
+    });
+
+    // File upload
+    const uploadZone=document.getElementById('upload-zone');
+    uploadZone.addEventListener('dragover',e=>{e.preventDefault();uploadZone.classList.add('dragover');});
+    uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop',e=>{e.preventDefault();uploadZone.classList.remove('dragover');handleFile(e.dataTransfer.files[0]);});
+    document.getElementById('file-input').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+
+    function handleFile(file){
+      if(!file||!file.type.startsWith('image/'))return;
+      uploadedFile=file;selectedDemo=null;
+      document.querySelectorAll('.demo-thumb').forEach(t=>t.classList.remove('selected'));
+      document.getElementById('upload-text').textContent='✅ '+file.name;
+      document.getElementById('btn-analyze').disabled=false;
+    }
+
+    // Run analysis
+    document.getElementById('btn-analyze').addEventListener('click',()=>{
+      const scenario=selectedDemo?SCENARIOS[selectedDemo]:SCENARIOS['flood'];
+      const btn=document.getElementById('btn-analyze');
+      btn.disabled=true;btn.textContent='🔄 AI Processing...';
+
+      // Show progress
+      const prog=document.getElementById('progress-scan');
+      const bar=document.getElementById('progress-bar');
+      prog.style.display='block';
+      bar.style.width='0%';
+      setTimeout(()=>{bar.style.width='100%';},100);
+
+      // If user uploaded a file, show preview
+      if(uploadedFile){
+        const reader=new FileReader();
+        reader.onload=e=>{
+          const preview=document.getElementById('image-preview');
+          preview.style.display='block';
+          preview.innerHTML='<img src="'+e.target.result+'" /><canvas id="overlay-canvas"></canvas>';
+          setTimeout(()=>drawDetections(preview),500);
+        };
+        reader.readAsDataURL(uploadedFile);
+      }else{
+        // For demos, show a colored placeholder
+        const preview=document.getElementById('image-preview');
+        const colors={flood:'#1e3a5f',earthquake:'#5c3a1e',fire:'#5c1e1e',cyclone:'#1e3a5c',landslide:'#3a3a1e',tsunami:'#1e4a5c'};
+        preview.style.display='block';
+        preview.style.background=colors[selectedDemo]||'#1e1e1e';
+        preview.style.minHeight='220px';
+        preview.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:220px;font-size:4rem;opacity:0.3">'+{flood:'🌊',earthquake:'🏚️',fire:'🔥',cyclone:'🌀',landslide:'⛰️',tsunami:'🌊'}[selectedDemo]+'</div>';
+      }
+
+      // Simulate AI processing time
+      setTimeout(()=>{
+        scansCount++;
+        renderAnalysis(scenario);
+        renderFindings(scenario);
+        renderDamageChart(scenario);
+        updateDetStats(scenario);
+
+        prog.style.display='none';bar.style.width='0%';
+        btn.disabled=false;btn.textContent='🧠 Run AI Analysis';
+      },3000);
+    });
+
+    function drawDetections(preview){
+      // Draw bounding boxes on uploaded image
+      const boxes=[
+        {x:10,y:15,w:30,h:25,label:'Flood Zone',color:'#2563eb'},
+        {x:50,y:20,w:20,h:30,label:'Building Damage',color:'#dc2626'},
+        {x:15,y:55,w:35,h:20,label:'Road Block',color:'#ea580c'},
+        {x:60,y:60,w:25,h:25,label:'Debris Field',color:'#7c3aed'}
+      ];
+      boxes.forEach(b=>{
+        const div=document.createElement('div');
+        div.className='detection-overlay';
+        div.style.cssText=`left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%;border-color:${b.color};color:${b.color};background:${b.color}10;`;
+        div.textContent=b.label;
+        preview.appendChild(div);
+      });
+    }
+
+    function renderAnalysis(scenario){
+      document.getElementById('analysis-bars').innerHTML=scenario.analyses.map(a=>`<div class="analysis-bar"><span class="analysis-label">${a.label}</span><div class="analysis-meter"><div class="analysis-fill" style="width:${a.pct}%;background:${a.color}"></div></div><span class="analysis-pct" style="color:${a.color}">${a.pct}%</span></div>`).join('');
+    }
+
+    function renderFindings(scenario){
+      document.getElementById('findings-list').innerHTML=scenario.findings.map(f=>{
+        const confColor=f.confidence>90?'#16a34a':f.confidence>80?'#ca8a04':'#ea580c';
+        return`<div class="finding-item"><div class="finding-header"><span class="finding-type" style="color:${f.color}">${f.icon} ${f.type}</span><span class="finding-confidence" style="background:${confColor}15;color:${confColor}">${f.confidence}%</span></div><div class="finding-desc">${f.desc}</div></div>`;
+      }).join('');
+    }
+
+    function renderDamageChart(scenario){
+      if(damageChart)damageChart.destroy();
+      const d=scenario.damages;
+      damageChart=new Chart(document.getElementById('chart-damage'),{type:'doughnut',
+        data:{labels:['Destroyed','Major Damage','Minor Damage','Flooded','Fire'],
+          datasets:[{data:[d.destroyed,d.major,d.minor,d.flooded,d.fires],
+            backgroundColor:['#dc2626','#ea580c','#ca8a04','#2563eb','#f97316']}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{family:'Inter',size:10}}}}}
+      });
+    }
+
+    function updateDetStats(scenario){
+      const d=scenario.damages;
+      document.getElementById('s-damaged').textContent=d.destroyed+d.major;
+      document.getElementById('s-flooded').textContent=d.flooded;
+      document.getElementById('s-buildings').textContent=d.destroyed+d.major+d.minor;
+      const avgConf=Math.round(scenario.findings.reduce((s,f)=>s+f.confidence,0)/scenario.findings.length);
+      document.getElementById('s-confidence').textContent=avgConf+'%';
+      document.getElementById('s-scans').textContent=scansCount;
+    }
+  </script>
+</body>
+</html>
