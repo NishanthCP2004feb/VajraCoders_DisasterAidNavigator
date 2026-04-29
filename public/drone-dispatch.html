@@ -11,23 +11,23 @@
     .drone-layout{display:grid;grid-template-columns:1fr 360px;gap:14px;padding:14px 20px;height:calc(100vh - 54px)}
     .drone-map-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
     #drone-map{flex:1;min-height:300px}
-    .drone-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+    .drone-sidebar{display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-bottom:14px;max-height:calc(100vh - 68px)}
     .drone-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .d-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;box-shadow:var(--shadow)}
-    .d-stat-val{font-size:1.2rem;font-weight:800;font-family:'JetBrains Mono',monospace}
-    .d-stat-key{font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+    .d-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;box-shadow:var(--shadow)}
+    .d-stat-val{font-size:1.1rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .d-stat-key{font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;margin-top:1px}
     .drone-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
-    .dispatch-form{padding:14px;display:flex;flex-direction:column;gap:10px}
-    .form-group{display:flex;flex-direction:column;gap:4px}
-    .form-label{font-size:0.75rem;font-weight:600;color:var(--text-secondary)}
-    .form-select,.form-input{border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:0.82rem;font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);outline:none}
+    .dispatch-form{padding:12px;display:flex;flex-direction:column;gap:8px}
+    .form-group{display:flex;flex-direction:column;gap:3px}
+    .form-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary)}
+    .form-select,.form-input{border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:0.8rem;font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);outline:none}
     .form-select:focus,.form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
     .form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .payload-chips{display:flex;flex-wrap:wrap;gap:6px}
-    .payload-chip{padding:4px 10px;border:1px solid var(--border);border-radius:14px;font-size:0.72rem;cursor:pointer;transition:all 0.2s}
+    .payload-chips{display:flex;flex-wrap:wrap;gap:5px}
+    .payload-chip{padding:3px 8px;border:1px solid var(--border);border-radius:14px;font-size:0.68rem;cursor:pointer;transition:all 0.2s}
     .payload-chip:hover{border-color:var(--accent)}
     .payload-chip.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
-    .btn-dispatch{background:linear-gradient(135deg,#0891b2,#0e7490);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:700;cursor:pointer;transition:all 0.2s;width:100%;font-family:'Inter',sans-serif}
+    .btn-dispatch{background:linear-gradient(135deg,#0891b2,#0e7490);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:700;cursor:pointer;transition:all 0.2s;width:100%;font-family:'Inter',sans-serif;margin-top:4px}
     .btn-dispatch:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(8,145,178,0.35)}
     .mission-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem;animation:m-in 0.3s ease}
     @keyframes m-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -38,9 +38,9 @@
     .mission-status{padding:2px 8px;border-radius:10px;font-size:0.62rem;font-weight:700;text-transform:uppercase;flex-shrink:0}
     .progress-bar{height:4px;background:var(--bg-primary);border-radius:2px;margin-top:4px;overflow:hidden}
     .progress-fill{height:100%;border-radius:2px;background:var(--accent);transition:width 0.5s}
-    .flight-info{background:rgba(8,145,178,0.05);border:1px solid rgba(8,145,178,0.15);border-radius:8px;padding:10px;font-size:0.72rem;color:var(--text-secondary);line-height:1.6}
-    .blocked-badge{background:rgba(220,38,38,0.08);color:#dc2626;border:1px solid rgba(220,38,38,0.2);border-radius:6px;padding:6px 10px;font-size:0.72rem;font-weight:600;display:flex;align-items:center;gap:6px}
-    @media(max-width:800px){.drone-layout{grid-template-columns:1fr;height:auto}}
+    .flight-info{background:rgba(8,145,178,0.05);border:1px solid rgba(8,145,178,0.15);border-radius:8px;padding:8px 10px;font-size:0.7rem;color:var(--text-secondary);line-height:1.5}
+    .blocked-badge{background:rgba(220,38,38,0.08);color:#dc2626;border:1px solid rgba(220,38,38,0.2);border-radius:6px;padding:5px 10px;font-size:0.7rem;font-weight:600;display:flex;align-items:center;gap:6px}
+    @media(max-width:800px){.drone-layout{grid-template-columns:1fr;height:auto}.drone-sidebar{max-height:none}}
   </style>
 </head>
 <body>
@@ -134,19 +134,31 @@
 
         zones.forEach(z=>{
           const isBlocked=z.roadAccess==='blocked';
-          const color=isBlocked?'#dc2626':z.severity>=6?'#ea580c':'#16a34a';
-          const marker=L.circleMarker([z.latitude,z.longitude],{radius:isBlocked?12:8,fillColor:color,color:isBlocked?'#dc2626':'#fff',weight:isBlocked?3:2,fillOpacity:isBlocked?0.5:0.3,dashArray:isBlocked?'5,5':''}).addTo(map);
-          marker.bindPopup(`<b style="color:${color}">${z.name}</b><br>Access: <b>${z.roadAccess}</b><br>Severity: ${z.severity}/10`);
+          const isDamaged=z.severity>=6;
+          const color=isBlocked?'#dc2626':isDamaged?'#ea580c':'#16a34a';
+          const radius=isBlocked?12:isDamaged?10:7;
+          const marker=L.circleMarker([z.latitude,z.longitude],{radius,fillColor:color,color:isBlocked?'#dc2626':'#fff',weight:isBlocked?3:2,fillOpacity:isBlocked?0.5:isDamaged?0.4:0.25,dashArray:isBlocked?'5,5':''}).addTo(map);
+          
+          const dist=haversine(hub.latitude,hub.longitude,z.latitude,z.longitude);
+          const eta=Math.ceil(dist/60*60);
+          marker.bindPopup(`<b style="color:${color}">${z.name}</b><br>Access: <b>${z.roadAccess}</b><br>Severity: ${z.severity}/10<br>📏 ${dist.toFixed(1)} km from hub · ⏱️ ~${eta} min`);
 
           const opt=document.createElement('option');
           opt.value=z.id;
-          opt.textContent=(isBlocked?'🚧 ':'')+ z.name+' ('+z.roadAccess+')';
+          opt.textContent=(isBlocked?'🚧 ':isDamaged?'⚠️ ':'')+ z.name+' ('+z.roadAccess+')';
           sel.appendChild(opt);
 
-          // Draw blocked X markers
-          if(isBlocked){
-            const roadPts=[[z.latitude+0.005,z.longitude-0.005],[z.latitude-0.005,z.longitude+0.005]];
-            L.polyline(roadPts,{color:'#dc2626',weight:3,dashArray:'8,8',opacity:0.6}).addTo(routeLayer);
+          // Draw aerial route lines from hub to all damaged/blocked zones
+          if(isBlocked || isDamaged){
+            const routeColor=isBlocked?'#dc2626':'#ea580c';
+            const routeOpacity=isBlocked?0.5:0.3;
+            const routeWeight=isBlocked?2.5:1.5;
+            L.polyline([[hub.latitude,hub.longitude],[z.latitude,z.longitude]],{color:routeColor,weight:routeWeight,dashArray:isBlocked?'8,6':'4,8',opacity:routeOpacity}).addTo(routeLayer);
+
+            // Distance label at midpoint
+            const midLat=(hub.latitude+z.latitude)/2;
+            const midLng=(hub.longitude+z.longitude)/2;
+            L.marker([midLat,midLng],{icon:L.divIcon({className:'',html:`<div style="background:${routeColor};color:#fff;padding:1px 5px;border-radius:4px;font-size:0.55rem;font-weight:700;font-family:'JetBrains Mono',monospace;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.4)">${dist.toFixed(1)}km</div>`,iconSize:[0,0]})}).addTo(routeLayer);
           }
         });
 
@@ -173,8 +185,8 @@
       document.getElementById('fi-dist').textContent=dist.toFixed(1)+' km';
       document.getElementById('fi-eta').textContent=eta+' min';
       document.getElementById('fi-batt').textContent=Math.round(batt)+'%';
-      fetch('https://api.open-meteo.com/v1/forecast?latitude='+z.latitude+'&longitude='+z.longitude+'&current=windspeed_10m&timezone=auto')
-        .then(r=>r.json()).then(d=>{document.getElementById('fi-wind').textContent=(d.current?.windspeed_10m||'?')+' km/h';}).catch(()=>{document.getElementById('fi-wind').textContent='N/A';});
+      fetch('https://api.open-meteo.com/v1/forecast?latitude='+z.latitude+'&longitude='+z.longitude+'&current=wind_speed_10m&timezone=auto')
+        .then(r=>r.json()).then(d=>{document.getElementById('fi-wind').textContent=(d.current?.wind_speed_10m||'?')+' km/h';}).catch(()=>{document.getElementById('fi-wind').textContent='N/A';});
     }
 
     function haversine(lat1,lon1,lat2,lon2){

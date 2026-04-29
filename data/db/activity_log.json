@@ -1,0 +1,66 @@
+[
+  {
+    "id": "ACT-0008",
+    "type": "sos_resolved",
+    "source": "admin",
+    "message": "SOS SOS-005 → resolved",
+    "linkedId": "SOS-005",
+    "timestamp": "2026-04-29T02:50:27.892Z"
+  },
+  {
+    "id": "ACT-0007",
+    "type": "convoy_dispatch",
+    "source": "system",
+    "message": "Auto-dispatched convoy CV-002 for SOS-005 → Nishu (SOS-005)",
+    "linkedId": "CV-002",
+    "timestamp": "2026-04-29T02:50:06.332Z"
+  },
+  {
+    "id": "ACT-0006",
+    "type": "sos_dispatched",
+    "source": "admin",
+    "message": "SOS SOS-005 → dispatched",
+    "linkedId": "SOS-005",
+    "timestamp": "2026-04-29T02:50:06.330Z"
+  },
+  {
+    "id": "ACT-0005",
+    "type": "sos_resolved",
+    "source": "admin",
+    "message": "SOS SOS-003 → resolved",
+    "linkedId": "SOS-003",
+    "timestamp": "2026-04-29T02:49:51.772Z"
+  },
+  {
+    "id": "ACT-0004",
+    "type": "sos_resolved",
+    "source": "admin",
+    "message": "SOS SOS-002 → resolved",
+    "linkedId": "SOS-002",
+    "timestamp": "2026-04-29T02:49:51.767Z"
+  },
+  {
+    "id": "ACT-0003",
+    "type": "sos_resolved",
+    "source": "admin",
+    "message": "SOS SOS-001 → resolved",
+    "linkedId": "SOS-001",
+    "timestamp": "2026-04-29T02:49:51.752Z"
+  },
+  {
+    "id": "ACT-0002",
+    "type": "convoy_dispatch",
+    "source": "system",
+    "message": "Auto-dispatched convoy CV-001 for SOS-001 → Rajesh Kumar (SOS-001)",
+    "linkedId": "CV-001",
+    "timestamp": "2026-04-29T02:46:05.727Z"
+  },
+  {
+    "id": "ACT-0001",
+    "type": "sos_dispatched",
+    "source": "admin",
+    "message": "SOS SOS-001 → dispatched",
+    "linkedId": "SOS-001",
+    "timestamp": "2026-04-29T02:46:05.725Z"
+  }
+]

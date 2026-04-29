@@ -1,0 +1,13 @@
+[
+  {
+    "tier": "warning",
+    "title": "EarthQuake",
+    "message": "Escape",
+    "zones": [
+      "ALL"
+    ],
+    "id": "ALT-001",
+    "createdAt": "2026-04-29T03:38:11.972Z",
+    "acknowledged": false
+  }
+]

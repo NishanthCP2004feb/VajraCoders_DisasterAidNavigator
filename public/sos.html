@@ -53,6 +53,11 @@
     .status-acknowledged{background:rgba(37,99,235,0.1);color:#2563eb}
     .status-rescued{background:rgba(22,163,74,0.1);color:#16a34a}
     .success-msg{background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);color:#16a34a;padding:10px 14px;border-radius:8px;font-size:0.82rem;font-weight:600;text-align:center;animation:msg-in 0.3s ease}
+    .panic-btn{background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;border:none;border-radius:50%;width:80px;height:80px;font-size:1.8rem;cursor:pointer;box-shadow:0 0 0 0 rgba(220,38,38,0.5);animation:panic-pulse 1.5s ease-in-out infinite;transition:transform 0.2s;display:flex;align-items:center;justify-content:center;margin:10px auto}
+    .panic-btn:hover{transform:scale(1.1)}
+    @keyframes panic-pulse{0%{box-shadow:0 0 0 0 rgba(220,38,38,0.5)}70%{box-shadow:0 0 0 20px rgba(220,38,38,0)}100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}}
+    .admin-reply{background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.15);border-radius:6px;padding:5px 8px;margin-top:4px;font-size:0.68rem;color:#2563eb}
+    .countdown{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:#ea580c;margin-top:4px}
     @media(max-width:800px){.sos-layout{grid-template-columns:1fr;height:auto}.sos-map-panel{min-height:400px}}
   </style>
 </head>
@@ -125,6 +130,11 @@
         </div>
         <button type="submit" class="btn-sos">🆘 SEND SOS BEACON</button>
         <div id="sos-success" class="hidden"></div>
+        <div style="text-align:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px">⚡ ONE-TAP EMERGENCY</div>
+          <button type="button" class="panic-btn" id="panic-btn" title="One-Tap SOS">🆘</button>
+          <div style="font-size:0.65rem;color:var(--text-muted)">Auto-sends with your GPS</div>
+        </div>
       </form>
     </div>
 
@@ -165,26 +175,30 @@
       }, () => alert('Location access denied'));
     });
 
-    // Submit SOS
-    document.getElementById('sos-form').addEventListener('submit', e => {
+    // Submit SOS — sends to server
+    document.getElementById('sos-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const beacon = {
-        id: 'SOS-' + String(beacons.length + 1).padStart(3, '0'),
         name: document.getElementById('sos-name').value,
-        lat: parseFloat(document.getElementById('sos-lat').value),
-        lng: parseFloat(document.getElementById('sos-lng').value),
+        latitude: parseFloat(document.getElementById('sos-lat').value),
+        longitude: parseFloat(document.getElementById('sos-lng').value),
         people: parseInt(document.getElementById('sos-people').value),
         urgency: selectedUrgency,
-        type: document.getElementById('sos-type').value,
+        emergencyType: document.getElementById('sos-type').value,
         details: document.getElementById('sos-details').value,
-        time: new Date(),
-        status: 'active'
+        phone: sessionStorage.getItem('crisisiq_phone') || ''
       };
-      addBeacon(beacon);
-      const suc = document.getElementById('sos-success');
-      suc.className = 'success-msg';
-      suc.textContent = `✅ SOS Beacon ${beacon.id} transmitted! Help is on the way.`;
-      setTimeout(() => suc.className = 'hidden', 4000);
+      try {
+        const resp = await fetch('/api/sos', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(beacon) });
+        const data = await resp.json();
+        if (data.success) {
+          addBeacon({ ...data.beacon, lat:data.beacon.latitude, lng:data.beacon.longitude, time:new Date(data.beacon.timestamp) });
+          const suc = document.getElementById('sos-success');
+          suc.className = 'success-msg';
+          suc.textContent = `✅ SOS Beacon ${data.beacon.id} transmitted! Help is on the way.`;
+          setTimeout(() => suc.className = 'hidden', 4000);
+        }
+      } catch(err) { alert('Failed to send SOS. Try again.'); }
     });
 
     function addBeacon(b) {
@@ -195,7 +209,7 @@
         className: 'custom-marker', iconSize: [36,36], iconAnchor: [18,18]
       });
       L.marker([b.lat, b.lng], { icon: svgIcon }).addTo(beaconLayer)
-        .bindPopup(`<b style="color:${color}">🆘 ${b.id}</b><br>${b.name} — ${b.people} people<br><small>${b.type}</small>`);
+        .bindPopup(`<b style="color:${color}">🆘 ${b.id}</b><br>${b.name} — ${b.people} people<br><small>${b.emergencyType||b.type||''}</small>`);
       map.setView([b.lat, b.lng], 13);
       renderBeaconList();
       document.getElementById('beacon-count').textContent = beacons.filter(x=>x.status==='active').length + ' Active Beacons';
@@ -205,18 +219,64 @@
       const list = document.getElementById('beacon-list');
       list.innerHTML = beacons.map(b => {
         const color = URGENCY_COLORS[b.urgency];
-        const statusClass = 'status-' + b.status;
-        return `<div class="beacon-item"><div class="beacon-pulse" style="background:${color}"></div><div class="beacon-info"><div class="beacon-name">${b.id} — ${b.name}</div><div class="beacon-detail">${b.people} people · ${b.type}</div></div><span class="beacon-status ${statusClass}">${b.status}</span><span class="beacon-time">${b.time.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'})}</span></div>`;
+        const statusColors = {active:'#dc2626',acknowledged:'#2563eb',dispatched:'#7c3aed',resolved:'#16a34a'};
+        const sc = statusColors[b.status]||'#6b7280';
+        let extra = '';
+        if (b.adminResponse) extra += `<div class="admin-reply">🛡️ Admin: ${b.adminResponse}</div>`;
+        if (b.status==='dispatched') extra += `<div class="countdown" style="color:#7c3aed">🚛 Convoy dispatched! Help is on the way.</div>`;
+        if (b.status==='resolved') extra += `<div class="countdown" style="color:#16a34a">✅ Resolved — you are safe.</div>`;
+        return `<div class="beacon-item" style="flex-wrap:wrap"><div class="beacon-pulse" style="background:${color}"></div><div class="beacon-info"><div class="beacon-name">${b.id} — ${b.name}</div><div class="beacon-detail">${b.people} people · ${b.emergencyType||b.type||''}</div>${extra}</div><span class="beacon-status" style="background:${sc}15;color:${sc}">${b.status}</span><span class="beacon-time">${new Date(b.time||b.timestamp).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'})}</span></div>`;
       }).join('');
     }
 
-    // Pre-populate demo beacons
-    const demoBeacons = [
-      { id:'SOS-D01', name:'Rajesh Kumar', lat:13.09, lng:80.28, people:5, urgency:'critical', type:'Trapped under debris', details:'Building collapsed', time:new Date(Date.now()-300000), status:'active' },
-      { id:'SOS-D02', name:'Priya Nair', lat:13.06, lng:80.25, people:12, urgency:'high', type:'Flood — need evacuation', details:'Water rising in basement', time:new Date(Date.now()-180000), status:'acknowledged' },
-      { id:'SOS-D03', name:'Arun Sharma', lat:13.15, lng:80.31, people:3, urgency:'medium', type:'Medical emergency', details:'Elderly person needs medication', time:new Date(Date.now()-60000), status:'active' }
-    ];
-    demoBeacons.forEach(addBeacon);
+    // Load existing beacons from server on page load
+    async function loadBeacons() {
+      try {
+        const d = await (await fetch('/api/sos')).json();
+        d.beacons.forEach(b => {
+          if (!beacons.find(e=>e.id===b.id)) {
+            addBeacon({ ...b, lat:b.latitude, lng:b.longitude, time:new Date(b.timestamp) });
+          }
+        });
+      } catch(e) {}
+    }
+    loadBeacons();
+
+    // Poll for status + admin response updates every 5s
+    setInterval(async ()=>{
+      try{
+        const d=await(await fetch('/api/sos')).json();
+        beacons.forEach(b=>{
+          const u=d.beacons.find(s=>s.id===b.id);
+          if(u){b.status=u.status;b.adminResponse=u.adminResponse||'';}
+        });
+        renderBeaconList();
+        document.getElementById('beacon-count').textContent=beacons.filter(x=>x.status==='active').length+' Active Beacons';
+      }catch(e){}
+    },5000);
+
+    // ONE-TAP PANIC BUTTON
+    document.getElementById('panic-btn').addEventListener('click', async ()=>{
+      const btn=document.getElementById('panic-btn');
+      btn.textContent='⏳';btn.disabled=true;
+      const user=sessionStorage.getItem('crisisiq_user')||'Emergency User';
+      let lat=13.08,lng=80.27;
+      try{
+        const pos=await new Promise((ok,no)=>navigator.geolocation.getCurrentPosition(ok,no,{timeout:5000}));
+        lat=pos.coords.latitude;lng=pos.coords.longitude;
+      }catch(e){}
+      try{
+        const resp=await fetch('/api/sos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:user,latitude:lat,longitude:lng,people:1,urgency:'critical',emergencyType:'ONE-TAP EMERGENCY',details:'Auto-generated panic SOS',phone:sessionStorage.getItem('crisisiq_phone')||''})});
+        const data=await resp.json();
+        if(data.success){
+          addBeacon({...data.beacon,lat:data.beacon.latitude,lng:data.beacon.longitude,time:new Date(data.beacon.timestamp)});
+          const suc=document.getElementById('sos-success');suc.className='success-msg';
+          suc.textContent='🚨 PANIC SOS '+data.beacon.id+' sent! GPS: '+lat.toFixed(4)+', '+lng.toFixed(4);
+          setTimeout(()=>suc.className='hidden',5000);
+        }
+      }catch(e){alert('SOS failed!');}
+      btn.textContent='🆘';btn.disabled=false;
+    });
   </script>
 </body>
 </html>

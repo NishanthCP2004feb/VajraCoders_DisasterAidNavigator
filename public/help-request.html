@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Request Help — CrisisIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .help-layout{display:flex;flex-direction:column;gap:14px;padding:14px 20px;max-width:700px;margin:0 auto;min-height:calc(100vh - 54px)}
+    .help-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .help-hero{text-align:center;padding:30px 20px;background:linear-gradient(135deg,rgba(220,38,38,0.04),rgba(234,88,12,0.04));border-bottom:1px solid var(--border)}
+    .help-hero-icon{font-size:3rem;margin-bottom:10px}
+    .help-hero-title{font-size:1.5rem;font-weight:800;color:var(--text-primary)}
+    .help-hero-sub{font-size:0.82rem;color:var(--text-muted);margin-top:6px}
+    .form-section{padding:20px}
+    .form-group{margin-bottom:16px}
+    .form-label{display:block;font-size:0.78rem;font-weight:700;color:var(--text-secondary);margin-bottom:6px}
+    .form-label .required{color:#dc2626}
+    .form-input,.form-select,.form-textarea{width:100%;padding:12px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:0.85rem;font-family:'Inter',sans-serif;outline:none;transition:all 0.2s}
+    .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,0.08)}
+    .form-textarea{resize:vertical;min-height:80px}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .need-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .need-option{padding:14px 8px;border:2px solid var(--border);border-radius:12px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--bg-primary)}
+    .need-option:hover{border-color:var(--accent);transform:translateY(-2px)}
+    .need-option.selected{border-color:#dc2626;background:rgba(220,38,38,0.05);box-shadow:0 4px 12px rgba(220,38,38,0.1)}
+    .need-option input{display:none}
+    .need-icon{font-size:1.5rem;margin-bottom:4px}
+    .need-label{font-size:0.72rem;font-weight:700;color:var(--text-secondary)}
+    .urgency-options{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+    .urgency-btn{padding:10px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;font-size:0.78rem;font-weight:700;background:var(--bg-primary)}
+    .urgency-btn:hover{transform:translateY(-1px)}
+    .urgency-btn.selected.critical{border-color:#dc2626;background:rgba(220,38,38,0.08);color:#dc2626}
+    .urgency-btn.selected.high{border-color:#ea580c;background:rgba(234,88,12,0.08);color:#ea580c}
+    .urgency-btn.selected.medium{border-color:#ca8a04;background:rgba(202,138,4,0.08);color:#ca8a04}
+    .emergency-numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+    .emg-num{background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;transition:all 0.2s}
+    .emg-num:hover{border-color:#dc2626;transform:translateY(-1px)}
+    .emg-num-icon{font-size:1.3rem}
+    .emg-num-label{font-size:0.65rem;color:var(--text-muted);margin:4px 0 2px}
+    .emg-num-val{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:800;color:#dc2626}
+    .emg-num a{color:#dc2626;text-decoration:none}
+    .btn-submit{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:12px;padding:14px;font-size:1rem;font-weight:800;cursor:pointer;width:100%;font-family:'Inter',sans-serif;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px}
+    .btn-submit:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(220,38,38,0.3)}
+    .btn-submit:disabled{opacity:0.5;cursor:default;transform:none}
+    .btn-locate{background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:0.78rem;cursor:pointer;font-family:'Inter',sans-serif;color:var(--accent);font-weight:600;transition:all 0.2s}
+    .btn-locate:hover{border-color:var(--accent)}
+    .success-msg{background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);color:#16a34a;padding:16px;border-radius:12px;text-align:center;font-size:0.85rem;font-weight:600;display:none;margin-top:14px;animation:fade-in 0.3s ease}
+    .success-msg .success-id{font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:800;margin:6px 0}
+    @keyframes fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .my-requests{max-height:300px;overflow-y:auto}
+    .req-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.78rem}
+    .req-icon{font-size:1.2rem}
+    .req-info{flex:1}
+    .req-id{font-weight:700;font-family:'JetBrains Mono',monospace;font-size:0.75rem}
+    .req-need{font-size:0.72rem;color:var(--text-secondary)}
+    .req-status{padding:3px 10px;border-radius:6px;font-size:0.65rem;font-weight:700;text-transform:uppercase}
+    @media(max-width:600px){.need-grid{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}.emergency-numbers{grid-template-columns:1fr 1fr 1fr}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(220,38,38,0.08)">🚨</div>
+        <div><div class="nav-page-title">Request Emergency Help</div><div class="nav-page-sub">Submit your request · Emergency contacts</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live"><span class="dot" style="background:#dc2626"></span> EMERGENCY</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="help-layout">
+    <!-- Emergency Numbers -->
+    <div class="help-card">
+      <div class="card-header">📞 Emergency Helpline Numbers</div>
+      <div style="padding:14px">
+        <div class="emergency-numbers">
+          <div class="emg-num"><div class="emg-num-icon">🚔</div><div class="emg-num-label">Police</div><div class="emg-num-val"><a href="tel:100">100</a></div></div>
+          <div class="emg-num"><div class="emg-num-icon">🚑</div><div class="emg-num-label">Ambulance</div><div class="emg-num-val"><a href="tel:108">108</a></div></div>
+          <div class="emg-num"><div class="emg-num-icon">🚒</div><div class="emg-num-label">Fire & Rescue</div><div class="emg-num-val"><a href="tel:101">101</a></div></div>
+          <div class="emg-num"><div class="emg-num-icon">🆘</div><div class="emg-num-label">Disaster (NDMA)</div><div class="emg-num-val"><a href="tel:1078">1078</a></div></div>
+          <div class="emg-num"><div class="emg-num-icon">👩</div><div class="emg-num-label">Women Helpline</div><div class="emg-num-val"><a href="tel:1091">1091</a></div></div>
+          <div class="emg-num"><div class="emg-num-icon">👶</div><div class="emg-num-label">Child Helpline</div><div class="emg-num-val"><a href="tel:1098">1098</a></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Request Form -->
+    <div class="help-card">
+      <div class="help-hero">
+        <div class="help-hero-icon">🆘</div>
+        <div class="help-hero-title">Submit Help Request</div>
+        <div class="help-hero-sub">Your request will be sent directly to the emergency admin team</div>
+      </div>
+      <div class="form-section">
+        <div class="form-group">
+          <label class="form-label">What do you need? <span class="required">*</span></label>
+          <div class="need-grid" id="need-grid">
+            <label class="need-option" data-need="food"><input type="radio" name="need" value="food"/><div class="need-icon">🍱</div><div class="need-label">Food</div></label>
+            <label class="need-option" data-need="water"><input type="radio" name="need" value="water"/><div class="need-icon">💧</div><div class="need-label">Water</div></label>
+            <label class="need-option" data-need="medical"><input type="radio" name="need" value="medical"/><div class="need-icon">🏥</div><div class="need-label">Medical</div></label>
+            <label class="need-option" data-need="rescue"><input type="radio" name="need" value="rescue"/><div class="need-icon">🚒</div><div class="need-label">Rescue</div></label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Urgency Level <span class="required">*</span></label>
+          <div class="urgency-options" id="urgency-options">
+            <div class="urgency-btn critical" data-urgency="critical" onclick="selectUrgency(this)">🔴 Critical</div>
+            <div class="urgency-btn high" data-urgency="high" onclick="selectUrgency(this)">🟠 High</div>
+            <div class="urgency-btn medium" data-urgency="medium" onclick="selectUrgency(this)">🟡 Medium</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Your Name <span class="required">*</span></label>
+            <input type="text" class="form-input" id="req-name" placeholder="Full name"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number <span class="required">*</span></label>
+            <input type="tel" class="form-input" id="req-phone" placeholder="e.g. 9876543210"/>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Number of People Affected <span class="required">*</span></label>
+          <input type="number" class="form-input" id="req-people" placeholder="How many people need help?" min="1"/>
+        </div>
+
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <label class="form-label" style="margin:0">Location</label>
+            <button class="btn-locate" id="btn-locate" onclick="getLocation()">📍 Auto-Detect</button>
+          </div>
+          <input type="text" class="form-input" id="req-location" placeholder="Your address or GPS coordinates"/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Describe Your Emergency</label>
+          <textarea class="form-textarea" id="req-message" placeholder="Explain your situation in detail — trapped, injured, flood, etc."></textarea>
+        </div>
+
+        <button class="btn-submit" id="btn-submit" onclick="submitRequest()">🆘 Submit Emergency Request</button>
+
+        <div class="success-msg" id="success-msg">
+          ✅ <b>Request Submitted Successfully!</b>
+          <div class="success-id" id="success-id">HR-001</div>
+          <div>Admin team has been notified. Help is on the way.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- My Requests -->
+    <div class="help-card">
+      <div class="card-header">📋 My Submitted Requests</div>
+      <div class="my-requests" id="my-requests">
+        <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.78rem">No requests yet</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    let selectedNeed=null;let selectedUrgency=null;let myRequests=[];
+
+    // Need selection
+    document.getElementById('need-grid').addEventListener('click',e=>{
+      const opt=e.target.closest('.need-option');
+      if(!opt)return;
+      document.querySelectorAll('.need-option').forEach(o=>o.classList.remove('selected'));
+      opt.classList.add('selected');
+      opt.querySelector('input').checked=true;
+      selectedNeed=opt.dataset.need;
+    });
+
+    // Urgency selection
+    function selectUrgency(el){
+      document.querySelectorAll('.urgency-btn').forEach(b=>b.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedUrgency=el.dataset.urgency;
+    }
+
+    // GPS auto-detect
+    function getLocation(){
+      const btn=document.getElementById('btn-locate');
+      btn.textContent='⏳ Detecting...';
+      if(navigator.geolocation){
+        navigator.geolocation.getCurrentPosition(pos=>{
+          document.getElementById('req-location').value=pos.coords.latitude.toFixed(5)+', '+pos.coords.longitude.toFixed(5);
+          btn.textContent='✅ Detected';
+        },()=>{btn.textContent='❌ Failed';},{timeout:8000});
+      }else{btn.textContent='❌ Not supported';}
+    }
+
+    // Prefill from session
+    const sessionUser=sessionStorage.getItem('crisisiq_user');
+    const sessionPhone=sessionStorage.getItem('crisisiq_phone');
+    if(sessionUser)document.getElementById('req-name').value=sessionUser;
+    if(sessionPhone)document.getElementById('req-phone').value=sessionPhone;
+
+    // Submit
+    async function submitRequest(){
+      const name=document.getElementById('req-name').value.trim();
+      const phone=document.getElementById('req-phone').value.trim();
+      const people=document.getElementById('req-people').value;
+      const location=document.getElementById('req-location').value.trim();
+      const message=document.getElementById('req-message').value.trim();
+
+      if(!selectedNeed||!selectedUrgency||!name||!phone||!people){alert('Please fill all required fields');return;}
+
+      const btn=document.getElementById('btn-submit');
+      btn.disabled=true;btn.textContent='⏳ Submitting...';
+
+      try{
+        const resp=await fetch('/api/help-requests',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({need:selectedNeed,urgency:selectedUrgency,name,phone,people:parseInt(people),location,message})
+        });
+        const data=await resp.json();
+        if(data.success){
+          document.getElementById('success-id').textContent=data.request.id;
+          document.getElementById('success-msg').style.display='block';
+          myRequests.unshift(data.request);
+          renderMyRequests();
+          // Reset form
+          document.querySelectorAll('.need-option').forEach(o=>o.classList.remove('selected'));
+          document.querySelectorAll('.urgency-btn').forEach(b=>b.classList.remove('selected'));
+          document.getElementById('req-people').value='';
+          document.getElementById('req-message').value='';
+          selectedNeed=null;selectedUrgency=null;
+        }
+      }catch(e){alert('Failed to submit. Try again.');}
+
+      btn.disabled=false;btn.textContent='🆘 Submit Emergency Request';
+    }
+
+    function renderMyRequests(){
+      const el=document.getElementById('my-requests');
+      if(myRequests.length===0){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.78rem">No requests yet</div>';return;}
+      const needIcons={food:'🍱',water:'💧',medical:'🏥',rescue:'🚒'};
+      const statusColors={pending:'#ca8a04',accepted:'#16a34a',rejected:'#dc2626',dispatched:'#7c3aed',resolved:'#16a34a'};
+      el.innerHTML=myRequests.map(r=>{
+        const color=statusColors[r.status]||'#6b7280';
+        let extra='';
+        if(r.adminNote)extra+=`<div style="font-size:0.68rem;color:#2563eb;background:rgba(37,99,235,0.06);padding:4px 8px;border-radius:4px;margin-top:3px">🛡️ ${r.adminNote}</div>`;
+        if(r.status==='dispatched')extra+=`<div style="font-size:0.68rem;color:#7c3aed;margin-top:2px">🚛 Convoy dispatched to your location!</div>`;
+        if(r.status==='accepted')extra+=`<div style="font-size:0.68rem;color:#16a34a;margin-top:2px">✅ Request accepted — est. response: ~${Math.ceil(Math.random()*15+5)} min</div>`;
+        return`<div class="req-item" style="flex-wrap:wrap"><span class="req-icon">${needIcons[r.need]||'📦'}</span><div class="req-info"><div class="req-id">${r.id}</div><div class="req-need">${(r.need||'').toUpperCase()} · ${r.people} people · ${r.urgency}</div>${extra}</div><span class="req-status" style="background:${color}15;color:${color}">${r.status}</span></div>`;
+      }).join('');
+      // Save to localStorage
+      try{localStorage.setItem('crisisiq_my_requests',JSON.stringify(myRequests.map(r=>r.id)));}catch(e){}
+    }
+
+    // Load saved request IDs from localStorage
+    try{
+      const savedIds=JSON.parse(localStorage.getItem('crisisiq_my_requests')||'[]');
+      if(savedIds.length>0){
+        (async()=>{
+          try{
+            const d=await(await fetch('/api/help-requests')).json();
+            savedIds.forEach(id=>{
+              const r=d.requests.find(x=>x.id===id);
+              if(r&&!myRequests.find(x=>x.id===id))myRequests.push(r);
+            });
+            renderMyRequests();
+          }catch(e){}
+        })();
+      }
+    }catch(e){}
+
+    // Poll for status + admin note updates
+    async function checkStatus(){
+      if(myRequests.length===0)return;
+      try{
+        const d=await(await fetch('/api/help-requests')).json();
+        myRequests.forEach(r=>{
+          const updated=d.requests.find(sr=>sr.id===r.id);
+          if(updated){r.status=updated.status;r.adminNote=updated.adminNote||'';}
+        });
+        renderMyRequests();
+      }catch(e){}
+    }
+    setInterval(checkStatus,5000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+[
+  {
+    "need": "food",
+    "urgency": "high",
+    "name": "Test Citizen",
+    "phone": "9999999999",
+    "people": 5,
+    "location": "13.08, 80.27",
+    "message": "Need food supply",
+    "id": "HR-001",
+    "status": "dispatched",
+    "submittedAt": "2026-04-29T02:24:45.507Z",
+    "adminNote": "Bulk",
+    "respondedAt": "2026-04-29T02:32:29.222Z"
+  },
+  {
+    "need": "food",
+    "urgency": "critical",
+    "name": "N",
+    "phone": "1234567890",
+    "people": 30,
+    "location": "12.82320, 77.51467",
+    "message": "cusabiui",
+    "id": "HR-002",
+    "status": "dispatched",
+    "submittedAt": "2026-04-29T02:30:12.965Z",
+    "adminNote": "Bulk",
+    "respondedAt": "2026-04-29T02:32:29.229Z"
+  }
+]

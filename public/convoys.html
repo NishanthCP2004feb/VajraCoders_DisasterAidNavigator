@@ -163,7 +163,7 @@
         const statusClass = c.status === 'delivered' ? 'status-delivered' : 'status-transit';
         return `<div class="convoy-card ${c.status==='transit'?'active':''}">
           <div class="convoy-header"><span class="convoy-id">${c.icon} ${c.id}</span><span class="convoy-status ${statusClass}">${c.status}</span></div>
-          <div class="convoy-dest">→ ${c.dest.name} (${c.dest.district})</div>
+          <div class="convoy-dest">→ ${c.dest.name} (${c.dest.district})${c.source?` <span style="font-size:0.65rem;color:#7c3aed;background:rgba(124,58,237,0.08);padding:1px 6px;border-radius:4px">${c.source}</span>`:''}</div>
           <div class="convoy-cargo">${c.cargo.map(x=>`<span class="cargo-tag">${x}</span>`).join('')}</div>
           <div class="convoy-progress"><div class="convoy-progress-fill" style="width:${pct}%;background:${c.color}"></div></div>
           <div class="convoy-eta"><span>${pct}% complete</span><span>ETA: ${eta}</span></div>
@@ -180,6 +180,39 @@
         setTimeout(() => createConvoy('rescue', zoneData[1]), 1000);
       }
     }, 1500);
+
+    // Load auto-dispatched convoys from server (SOS/HR interlinking)
+    async function loadServerConvoys() {
+      try {
+        const d = await (await fetch('/api/convoys')).json();
+        const serverConvoys = d.convoys.filter(c => !convoys.find(e => e.id === c.id));
+        serverConvoys.forEach(sc => {
+          const cfg = CONVOY_TYPES[sc.type] || CONVOY_TYPES.supply;
+          const destZone = zoneData.find(z => z.name === sc.destination) || (zoneData[0] || { latitude:13.08, longitude:80.27, name:sc.destination, district:'Auto' });
+          const c = {
+            id: sc.id,
+            type: sc.type, icon: cfg.icon, color: cfg.color,
+            dest: destZone,
+            progress: sc.progress || Math.random()*0.3,
+            speed: cfg.speed,
+            status: sc.status || 'transit',
+            startLat: HUB.lat, startLng: HUB.lng,
+            curLat: HUB.lat, curLng: HUB.lng,
+            cargo: sc.cargo || ['📦 Supplies'],
+            source: sc.sourceType ? ('🔗 ' + sc.sourceId) : null,
+            marker: null, line: null
+          };
+          c.line = L.polyline([[HUB.lat, HUB.lng], [destZone.latitude, destZone.longitude]], { color: cfg.color, weight:2, opacity:0.4, dashArray:'8,6' }).addTo(map);
+          c.marker = L.marker([HUB.lat, HUB.lng], {
+            icon: L.divIcon({ html:`<div style="background:${cfg.color};color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px ${cfg.color}66;border:2px solid #fff">${cfg.icon}</div>`, className:'', iconSize:[28,28], iconAnchor:[14,14] })
+          }).addTo(map).bindPopup(`<b>${c.id}</b><br>${cfg.icon} → ${destZone.name}<br><small style="color:#7c3aed">${c.source||'Manual Dispatch'}</small>`);
+          convoys.push(c);
+        });
+        renderConvoyList();
+      } catch(e) {}
+    }
+    setTimeout(loadServerConvoys, 2000);
+    setInterval(loadServerConvoys, 8000);
   </script>
 </body>
 </html>

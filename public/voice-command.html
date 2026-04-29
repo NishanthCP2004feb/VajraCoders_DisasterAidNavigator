@@ -81,6 +81,17 @@
       <div class="cmd-card" data-cmd="show volunteers"><div class="cmd-icon">🤝</div><div class="cmd-phrase">"Show volunteers"</div><div class="cmd-desc">List registered volunteers</div></div>
       <div class="cmd-card" data-cmd="earthquake report"><div class="cmd-icon">🌍</div><div class="cmd-phrase">"Earthquake report"</div><div class="cmd-desc">Recent seismic activity</div></div>
       <div class="cmd-card" data-cmd="run forecast"><div class="cmd-icon">🧠</div><div class="cmd-phrase">"Run forecast"</div><div class="cmd-desc">AI predictive analysis</div></div>
+      <div class="cmd-card" data-cmd="show sos beacons"><div class="cmd-icon">🆘</div><div class="cmd-phrase">"Show SOS beacons"</div><div class="cmd-desc">Active emergency signals</div></div>
+      <div class="cmd-card" data-cmd="show convoys"><div class="cmd-icon">🚛</div><div class="cmd-phrase">"Show convoys"</div><div class="cmd-desc">Track dispatch deliveries</div></div>
+      <div class="cmd-card" data-cmd="show help requests"><div class="cmd-icon">📨</div><div class="cmd-phrase">"Show help requests"</div><div class="cmd-desc">Pending citizen requests</div></div>
+    </div>
+
+    <div class="section-title">⚡ Admin Action Commands</div>
+    <div class="cmd-grid">
+      <div class="cmd-card" data-cmd="deploy all volunteers" style="border-color:rgba(124,58,237,0.3)"><div class="cmd-icon">👷</div><div class="cmd-phrase">"Deploy all volunteers"</div><div class="cmd-desc">Deploy available units to critical zones</div></div>
+      <div class="cmd-card" data-cmd="distribute kits to all zones" style="border-color:rgba(124,58,237,0.3)"><div class="cmd-icon">📦</div><div class="cmd-phrase">"Distribute kits"</div><div class="cmd-desc">Send food & medical kits to zones</div></div>
+      <div class="cmd-card" data-cmd="dispatch all sos" style="border-color:rgba(124,58,237,0.3)"><div class="cmd-icon">🚑</div><div class="cmd-phrase">"Dispatch all SOS"</div><div class="cmd-desc">Respond & dispatch to all active SOS</div></div>
+      <div class="cmd-card" data-cmd="accept all pending requests" style="border-color:rgba(124,58,237,0.3)"><div class="cmd-icon">✅</div><div class="cmd-phrase">"Accept all requests"</div><div class="cmd-desc">Approve all pending help requests</div></div>
     </div>
 
     <div class="history-card">
@@ -92,125 +103,305 @@
   <script>
     setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
 
-    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-    let recognition;let isListening=false;let history=[];let zones=[];
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isListening = false;
+    let history = [];
+    let zones = [];
 
-    async function loadZones(){try{const d=await(await fetch('/api/zones')).json();zones=d.zones;}catch(e){}}
+    async function loadZones(){ try{ const d = await(await fetch('/api/zones')).json(); zones = d.zones; } catch(e){} }
     loadZones();
 
-    if(!SpeechRecognition){document.getElementById('no-support').style.display='block';}
-    else{
-      recognition=new SpeechRecognition();
-      recognition.continuous=false;recognition.interimResults=true;recognition.lang='en-US';
+    if (!SpeechRecognition) {
+      document.getElementById('no-support').style.display = 'block';
+      document.getElementById('mic-btn').style.opacity = '0.4';
+      document.getElementById('mic-btn').style.cursor = 'not-allowed';
+    } else {
+      function createRecognition() {
+        const rec = new SpeechRecognition();
+        rec.continuous = false;
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+        rec.maxAlternatives = 1;
 
-      recognition.onresult=e=>{
-        let transcript='';
-        for(let i=e.resultIndex;i<e.results.length;i++){transcript+=e.results[i][0].transcript;}
-        document.getElementById('voice-transcript').textContent=transcript;
-        if(e.results[e.results.length-1].isFinal){processCommand(transcript.toLowerCase().trim());}
-      };
-      recognition.onend=()=>{stopListening();};
-      recognition.onerror=e=>{document.getElementById('voice-status').textContent='Error: '+e.error;stopListening();};
+        rec.onstart = () => {
+          isListening = true;
+          document.getElementById('mic-btn').classList.add('listening');
+          document.getElementById('waveform').classList.add('active');
+          document.getElementById('voice-status').textContent = '🔴 Listening... speak now';
+          document.getElementById('voice-status').classList.add('active');
+          document.getElementById('voice-transcript').textContent = 'Listening...';
+        };
+
+        rec.onresult = (e) => {
+          let final = '', interim = '';
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const t = e.results[i][0].transcript;
+            if (e.results[i].isFinal) final += t;
+            else interim += t;
+          }
+          document.getElementById('voice-transcript').textContent = final || interim || 'Listening...';
+          if (final) {
+            processCommand(final.toLowerCase().trim());
+          }
+        };
+
+        rec.onerror = (e) => {
+          console.warn('Speech error:', e.error);
+          if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+            document.getElementById('voice-status').textContent = '⚠️ Microphone access denied — check browser permissions';
+            document.getElementById('no-support').style.display = 'block';
+            document.getElementById('no-support').textContent = '⚠️ Microphone permission denied. Click the lock icon in the address bar → Allow microphone access → Reload page.';
+          } else if (e.error === 'no-speech') {
+            document.getElementById('voice-status').textContent = '🔇 No speech detected — try again';
+          } else if (e.error === 'network') {
+            document.getElementById('voice-status').textContent = '🌐 Network error — check internet connection';
+          } else {
+            document.getElementById('voice-status').textContent = '⚠️ Error: ' + e.error;
+          }
+          resetUI();
+        };
+
+        rec.onend = () => {
+          resetUI();
+        };
+
+        return rec;
+      }
+
+      recognition = createRecognition();
     }
 
-    function startListening(){
-      if(!recognition)return;
-      isListening=true;recognition.start();
-      document.getElementById('mic-btn').classList.add('listening');
-      document.getElementById('waveform').classList.add('active');
-      document.getElementById('voice-status').textContent='🔴 Listening...';
-      document.getElementById('voice-status').classList.add('active');
-    }
-
-    function stopListening(){
-      isListening=false;
-      try{recognition.stop();}catch(e){}
+    function resetUI() {
+      isListening = false;
       document.getElementById('mic-btn').classList.remove('listening');
       document.getElementById('waveform').classList.remove('active');
-      document.getElementById('voice-status').textContent='Click microphone or press Space to start';
+      if (!document.getElementById('voice-status').classList.contains('active') ||
+          document.getElementById('voice-status').textContent === '🔴 Listening... speak now') {
+        document.getElementById('voice-status').textContent = 'Click microphone or press Space to start';
+      }
       document.getElementById('voice-status').classList.remove('active');
     }
 
-    document.getElementById('mic-btn').addEventListener('click',()=>{if(isListening)stopListening();else startListening();});
-    document.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.target.matches('input,textarea')){e.preventDefault();if(isListening)stopListening();else startListening();}});
+    function startListening() {
+      if (!SpeechRecognition || isListening) return;
+      // Recreate recognition each time to avoid stale state
+      recognition = createRecognition();
+      try {
+        recognition.start();
+      } catch(e) {
+        console.warn('Recognition start error:', e);
+        // Wait and retry once
+        setTimeout(() => {
+          try {
+            recognition = createRecognition();
+            recognition.start();
+          } catch(e2) {
+            document.getElementById('voice-status').textContent = '⚠️ Could not start — try again';
+            resetUI();
+          }
+        }, 300);
+      }
+    }
 
-    // Click-to-execute command cards
-    document.getElementById('cmd-grid').addEventListener('click',e=>{
-      const card=e.target.closest('.cmd-card');
-      if(!card)return;
-      const cmd=card.dataset.cmd;
-      document.getElementById('voice-transcript').textContent=cmd;
-      processCommand(cmd);
+    function stopListening() {
+      if (!recognition) return;
+      try { recognition.stop(); } catch(e) {}
+      resetUI();
+    }
+
+    document.getElementById('mic-btn').addEventListener('click', () => {
+      if (isListening) stopListening();
+      else startListening();
     });
 
-    async function processCommand(cmd){
-      let response='';let icon='🤖';
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' && !e.target.matches('input,textarea')) {
+        e.preventDefault();
+        if (isListening) stopListening();
+        else startListening();
+      }
+    });
 
-      if(cmd.includes('critical')||cmd.includes('urgent')){
-        const critical=zones.filter(z=>z.severity>=8);
-        response=`🔴 <b>${critical.length} Critical Zones Found:</b><br>`+critical.map(z=>`• <b>${z.name}</b> — Severity ${z.severity}/10, Population ${z.population.toLocaleString()}`).join('<br>');
-        icon='🔴';
-      } else if(cmd.includes('allocate')||cmd.includes('resources')){
-        response='⚡ <b>Resource Allocation Triggered.</b><br>Generating optimal distribution plan across all '+zones.length+' zones based on priority scores. Check the <a href="/command-center.html">Command Center</a> for full allocation table.';
-        icon='⚡';
-      } else if(cmd.includes('drone')||cmd.includes('launch')){
-        const blocked=zones.filter(z=>z.roadAccess==='blocked');
-        response=`🚁 <b>Drone Dispatch Ready.</b><br>${blocked.length} blocked zones identified for aerial delivery:<br>`+blocked.map(z=>`• <b>${z.name}</b> — Road: ${z.roadAccess}`).join('<br>')+'<br>Visit <a href="/drone-dispatch.html">Drone Dispatch</a> to launch.';
-        icon='🚁';
-      } else if(cmd.includes('emergency')||cmd.includes('broadcast')){
-        response='🚨 <b>EMERGENCY BROADCAST initiated.</b><br>Alert sent to all zones. Tier: EMERGENCY. All field teams notified. Visit <a href="/alerts.html">Alert System</a> for details.';
-        icon='🚨';
-      } else if(cmd.includes('status')||cmd.includes('report')){
-        try{
-          const stats=await(await fetch('/api/stats')).json();
-          response=`📊 <b>System Status Report:</b><br>• Zones: ${stats.zones} | Critical: ${stats.criticalZones}<br>• Population: ${stats.population?.toLocaleString()}<br>• SOS Beacons: ${stats.activeBeacons}<br>• Volunteers: ${stats.volunteers}<br>• Active Alerts: ${stats.activeAlerts}<br>• Infrastructure Reports: ${stats.infraReports}<br>• Health Cases: ${stats.healthCases}`;
-        }catch(e){response='📊 Unable to fetch system stats.';}
-        icon='📊';
-      } else if(cmd.includes('weather')){
-        try{
-          const w=await(await fetch('https://api.open-meteo.com/v1/forecast?latitude=13.08&longitude=80.27&current=precipitation,windspeed_10m,weathercode&timezone=auto')).json();
-          const rain=w.current?.precipitation||0;const wind=w.current?.windspeed_10m||0;
-          response=`🌦️ <b>Live Weather (Chennai):</b><br>• Precipitation: ${rain} mm<br>• Wind Speed: ${wind} km/h<br>• Conditions: ${rain>5?'Heavy Rain':rain>0?'Light Rain':'Clear'}`;
-        }catch(e){response='🌦️ Weather API unavailable.';}
-        icon='🌦️';
-      } else if(cmd.includes('volunteer')){
-        try{
-          const v=await(await fetch('/api/volunteers')).json();
-          response=`🤝 <b>${v.total} Volunteers Registered.</b><br>`+(v.volunteers.slice(0,5).map(vol=>`• <b>${vol.name||vol.id}</b> — ${(vol.skills||[]).join(', ')||'General'}`).join('<br>')||'No volunteers yet.');
-        }catch(e){response='🤝 Volunteer data unavailable.';}
-        icon='🤝';
-      } else if(cmd.includes('earthquake')||cmd.includes('seismic')){
-        try{
-          const eq=await(await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson')).json();
-          response=`🌍 <b>${eq.features?.length||0} Earthquakes (24h, M2.5+):</b><br>`+(eq.features?.slice(0,4).map(f=>`• <b>M${f.properties.mag}</b> — ${f.properties.place}`).join('<br>')||'None detected.');
-        }catch(e){response='🌍 USGS data unavailable.';}
-        icon='🌍';
-      } else if(cmd.includes('forecast')||cmd.includes('predict')){
-        response='🧠 <b>AI Forecast Running...</b><br>Analyzing weather trends, zone vulnerabilities, and historical patterns. View full predictions at <a href="/forecasting.html">AI Forecasting</a>.';
-        icon='🧠';
+    // Click-to-execute command cards (all grids)
+    document.querySelectorAll('.cmd-grid').forEach(grid => {
+      grid.addEventListener('click', e => {
+        const card = e.target.closest('.cmd-card');
+        if (!card) return;
+        const cmd = card.dataset.cmd;
+        document.getElementById('voice-transcript').textContent = cmd;
+        processCommand(cmd);
+      });
+    });
+
+    async function processCommand(cmd) {
+      let response = ''; let icon = '🤖';
+
+      if (cmd.includes('critical') || cmd.includes('urgent')) {
+        const critical = zones.filter(z => z.severity >= 8);
+        response = `🔴 <b>${critical.length} Critical Zones Found:</b><br>` + critical.map(z => `• <b>${z.name}</b> — Severity ${z.severity}/10, Population ${z.population.toLocaleString()}`).join('<br>');
+        icon = '🔴';
+      // ═══ ADMIN ACTION: Deploy all volunteers ═══
+      } else if (cmd.includes('deploy') && (cmd.includes('volunteer') || cmd.includes('unit') || cmd.includes('all'))) {
+        try {
+          const v = await(await fetch('/api/volunteers')).json();
+          const available = v.volunteers.filter(vol => vol.status === 'available');
+          if (available.length === 0) {
+            response = '👷 <b>No available volunteers to deploy.</b> All units are already deployed or resting.';
+          } else {
+            const criticalZones = zones.filter(z => z.severity >= 6);
+            let deployed = [];
+            for (let i = 0; i < available.length; i++) {
+              const vol = available[i];
+              const zone = criticalZones[i % criticalZones.length];
+              try {
+                await fetch('/api/volunteers/' + vol.id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status: 'deployed', assignedZone: zone?.name || 'Field Operations' }) });
+                deployed.push(`✅ <b>${vol.name}</b> → ${zone?.name || 'Field'}`);
+              } catch(e) { deployed.push(`❌ ${vol.name} — failed`); }
+            }
+            response = `👷 <b>${deployed.length} Volunteers Deployed to Critical Zones:</b><br>` + deployed.join('<br>');
+          }
+        } catch(e) { response = '👷 Failed to deploy volunteers.'; }
+        icon = '👷';
+
+      // ═══ ADMIN ACTION: Distribute kits to zones ═══
+      } else if (cmd.includes('distribute') || cmd.includes('kit') || cmd.includes('supply')) {
+        try {
+          const plan = await(await fetch('/api/plan')).json();
+          const topZones = plan.rankedZones.slice(0, 5);
+          let results = [];
+          for (const z of topZones) {
+            results.push(`📦 <b>${z.name}</b> — ${z.allocated?.foodKits || 0} food kits, ${z.allocated?.medicalKits || 0} med kits, ${z.allocated?.waterUnits || 0} water units`);
+          }
+          response = `📦 <b>Kit Distribution Executed (${topZones.length} priority zones):</b><br>` + results.join('<br>') + `<br><br>⚡ Total: ${plan.resources?.foodKits || 0} food, ${plan.resources?.waterUnits || 0} water, ${plan.resources?.medicalKits || 0} medical kits allocated.`;
+        } catch(e) { response = '📦 Distribution plan generation failed.'; }
+        icon = '📦';
+
+      // ═══ ADMIN ACTION: Dispatch all active SOS ═══
+      } else if (cmd.includes('dispatch') && cmd.includes('sos')) {
+        try {
+          const s = await(await fetch('/api/sos')).json();
+          const active = s.beacons.filter(b => b.status === 'active');
+          if (active.length === 0) {
+            response = '🚑 <b>No active SOS beacons.</b> All emergencies have been handled.';
+          } else {
+            let dispatched = [];
+            for (const b of active) {
+              try {
+                const r = await fetch('/api/sos/' + b.id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status: 'dispatched', adminResponse: 'Voice Command: Emergency response dispatched' }) });
+                const d = await r.json();
+                dispatched.push(`🚑 <b>${b.id}</b> ${b.name} — dispatched` + (d.convoy ? ` → Convoy ${d.convoy.id} created` : ''));
+              } catch(e) { dispatched.push(`❌ ${b.id} — failed`); }
+            }
+            response = `🚑 <b>${dispatched.length} SOS Beacons Dispatched:</b><br>` + dispatched.join('<br>') + '<br><br>🚛 Convoys auto-created. Volunteers auto-deployed.';
+          }
+        } catch(e) { response = '🚑 SOS dispatch failed.'; }
+        icon = '🚑';
+
+      // ═══ ADMIN ACTION: Accept all pending help requests ═══
+      } else if (cmd.includes('accept') && (cmd.includes('request') || cmd.includes('pending') || cmd.includes('all'))) {
+        try {
+          const h = await(await fetch('/api/help-requests')).json();
+          const pending = h.requests.filter(r => r.status === 'pending');
+          if (pending.length === 0) {
+            response = '✅ <b>No pending requests.</b> All help requests have been processed.';
+          } else {
+            let accepted = [];
+            for (const r of pending) {
+              try {
+                await fetch('/api/help-requests/' + r.id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status: 'dispatched', adminNote: 'Voice Command: Approved and dispatched' }) });
+                accepted.push(`✅ <b>${r.id}</b> ${r.name} — ${r.need} → dispatched`);
+              } catch(e) { accepted.push(`❌ ${r.id} — failed`); }
+            }
+            response = `✅ <b>${accepted.length} Help Requests Dispatched:</b><br>` + accepted.join('<br>') + '<br><br>🚛 Convoys auto-created for each request.';
+          }
+        } catch(e) { response = '✅ Request processing failed.'; }
+        icon = '✅';
+
+      } else if (cmd.includes('allocate') || cmd.includes('resources')) {
+        response = '⚡ <b>Resource Allocation Triggered.</b><br>Generating optimal distribution plan across all ' + zones.length + ' zones based on priority scores. Check the <a href="/command-center.html">Command Center</a> for full allocation table.';
+        icon = '⚡';
+      } else if (cmd.includes('drone') || cmd.includes('launch')) {
+        const blocked = zones.filter(z => z.roadAccess === 'blocked');
+        response = `🚁 <b>Drone Dispatch Ready.</b><br>${blocked.length} blocked zones identified for aerial delivery:<br>` + blocked.map(z => `• <b>${z.name}</b> — Road: ${z.roadAccess}`).join('<br>') + '<br>Visit <a href="/drone-dispatch.html">Drone Dispatch</a> to launch.';
+        icon = '🚁';
+      } else if (cmd.includes('emergency') || cmd.includes('broadcast')) {
+        response = '🚨 <b>EMERGENCY BROADCAST initiated.</b><br>Alert sent to all zones. Tier: EMERGENCY. All field teams notified. Visit <a href="/alerts.html">Alert System</a> for details.';
+        icon = '🚨';
+      } else if (cmd.includes('status') || cmd.includes('report')) {
+        try {
+          const stats = await(await fetch('/api/stats')).json();
+          response = `📊 <b>System Status Report:</b><br>• Zones: ${stats.zones} | Critical: ${stats.criticalZones}<br>• Population: ${stats.population?.toLocaleString()}<br>• Active SOS: ${stats.activeBeacons}<br>• Volunteers: ${stats.volunteers} (${stats.deployedVolunteers} deployed)<br>• Active Convoys: ${stats.activeConvoys}<br>• Pending Help Requests: ${stats.pendingRequests}<br>• Infrastructure Reports: ${stats.infraReports}`;
+        } catch(e) { response = '📊 Unable to fetch system stats.'; }
+        icon = '📊';
+      } else if (cmd.includes('weather')) {
+        try {
+          const w = await(await fetch('https://api.open-meteo.com/v1/forecast?latitude=13.08&longitude=80.27&current=precipitation,wind_speed_10m,weather_code&timezone=auto')).json();
+          const rain = w.current?.precipitation || 0;
+          const wind = w.current?.wind_speed_10m || 0;
+          response = `🌦️ <b>Live Weather (Chennai):</b><br>• Precipitation: ${rain} mm<br>• Wind Speed: ${wind} km/h<br>• Conditions: ${rain > 5 ? 'Heavy Rain ⛈️' : rain > 0 ? 'Light Rain 🌧️' : 'Clear ☀️'}`;
+        } catch(e) { response = '🌦️ Weather API unavailable.'; }
+        icon = '🌦️';
+      } else if (cmd.includes('earthquake') || cmd.includes('seismic')) {
+        try {
+          const eq = await(await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson')).json();
+          response = `🌍 <b>${eq.features?.length || 0} Earthquakes (24h, M2.5+):</b><br>` + (eq.features?.slice(0, 4).map(f => `• <b>M${f.properties.mag}</b> — ${f.properties.place}`).join('<br>') || 'None detected.');
+        } catch(e) { response = '🌍 USGS data unavailable.'; }
+        icon = '🌍';
+      } else if (cmd.includes('forecast') || cmd.includes('predict')) {
+        response = '🧠 <b>AI Forecast Running...</b><br>Analyzing weather trends, zone vulnerabilities, and historical patterns. View full predictions at <a href="/forecasting.html">AI Forecasting</a>.';
+        icon = '🧠';
+      } else if (cmd.includes('sos') || cmd.includes('beacon')) {
+        try {
+          const s = await(await fetch('/api/sos')).json();
+          response = `🆘 <b>${s.total} SOS Beacons</b> (${s.active} active):<br>` + s.beacons.slice(0, 5).map(b => `• <b>${b.id}</b> ${b.name} — ${b.urgency} [${b.status}]`).join('<br>');
+        } catch(e) { response = '🆘 SOS data unavailable.'; }
+        icon = '🆘';
+      } else if (cmd.includes('convoy')) {
+        try {
+          const c = await(await fetch('/api/convoys')).json();
+          response = `🚛 <b>${c.total} Convoys</b> (${c.inTransit} in transit):<br>` + c.convoys.slice(0, 5).map(cv => `• <b>${cv.id}</b> → ${cv.destination} [${cv.status}]`).join('<br>');
+        } catch(e) { response = '🚛 Convoy data unavailable.'; }
+        icon = '🚛';
+      } else if (cmd.includes('help') || cmd.includes('request')) {
+        try {
+          const h = await(await fetch('/api/help-requests')).json();
+          response = `📨 <b>${h.total} Help Requests</b> (${h.pending} pending):<br>` + h.requests.slice(0, 5).map(r => `• <b>${r.id}</b> ${r.name} — ${r.need} [${r.status}]`).join('<br>');
+        } catch(e) { response = '📨 Help request data unavailable.'; }
+        icon = '📨';
+      } else if (cmd.includes('volunteer')) {
+        try {
+          const v = await(await fetch('/api/volunteers')).json();
+          response = `🤝 <b>${v.total} Volunteers Registered</b> (${v.deployed} deployed, ${v.available} available).<br>` + (v.volunteers.slice(0, 5).map(vol => `• <b>${vol.name || vol.id}</b> — ${(vol.skills || []).join(', ') || 'General'} [${vol.status}]`).join('<br>') || 'No volunteers yet.');
+        } catch(e) { response = '🤝 Volunteer data unavailable.'; }
+        icon = '🤝';
       } else {
-        response=`❓ Command not recognized: "<i>${cmd}</i>"<br>Try saying: "show critical zones", "status report", or "weather update".`;
-        icon='❓';
+        response = `❓ Command not recognized: "<i>${cmd}</i>"<br>Try: "deploy all volunteers", "distribute kits", "dispatch all sos", "accept all requests", "status report".`;
+        icon = '❓';
       }
 
       // Show response
-      const resDiv=document.getElementById('voice-response');
-      resDiv.innerHTML=response;resDiv.className='voice-response visible';
+      const resDiv = document.getElementById('voice-response');
+      resDiv.innerHTML = response;
+      resDiv.className = 'voice-response visible';
 
       // Speak response (text-to-speech)
-      const cleanText=response.replace(/<[^>]*>/g,'').replace(/•/g,'').substring(0,200);
-      const utterance=new SpeechSynthesisUtterance(cleanText);
-      utterance.rate=1.1;utterance.pitch=1;
-      speechSynthesis.speak(utterance);
+      try {
+        speechSynthesis.cancel(); // Cancel any previous speech
+        const cleanText = response.replace(/<[^>]*>/g, '').replace(/•/g, '').substring(0, 200);
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 1.1; utterance.pitch = 1;
+        speechSynthesis.speak(utterance);
+      } catch(e) {}
 
       // Add to history
-      history.unshift({cmd,response,icon,time:new Date()});
+      history.unshift({ cmd, response, icon, time: new Date() });
       renderHistory();
     }
 
-    function renderHistory(){
-      const list=document.getElementById('history-list');
-      list.innerHTML=history.slice(0,10).map(h=>`<div class="history-item"><div class="history-icon">${h.icon}</div><div class="history-info"><div class="history-cmd">"${h.cmd}"</div><div class="history-result">${h.response}</div></div><div class="history-time">${h.time.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'})}</div></div>`).join('');
+    function renderHistory() {
+      const list = document.getElementById('history-list');
+      list.innerHTML = history.slice(0, 10).map(h => `<div class="history-item"><div class="history-icon">${h.icon}</div><div class="history-info"><div class="history-cmd">"${h.cmd}"</div><div class="history-result">${h.response}</div></div><div class="history-time">${h.time.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'})}</div></div>`).join('');
     }
   </script>
 </body>

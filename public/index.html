@@ -142,6 +142,24 @@
     }
     .dash-footer a { color: var(--accent); text-decoration: none; }
 
+    .live-ticker{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;padding:10px 20px;animation:fade-in 0.4s ease}
+    .tick-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;box-shadow:var(--shadow);transition:all 0.2s}
+    .tick-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+    .tick-val{font-size:1.3rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .tick-label{font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;margin-top:2px}
+    @keyframes fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+    .feature-card.role-hidden{display:none!important}
+    .user-bar{display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 20px;background:var(--bg-card);border-bottom:1px solid var(--border)}
+    .user-info{display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:600;color:var(--text-primary)}
+    .user-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.85rem;color:#fff;font-weight:700}
+    .user-avatar.admin-avatar{background:linear-gradient(135deg,#7c3aed,#6d28d9)}
+    .user-avatar.public-avatar{background:linear-gradient(135deg,#2563eb,#1d4ed8)}
+    .role-badge{padding:3px 10px;border-radius:12px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+    .role-badge.admin-badge{background:rgba(124,58,237,0.1);color:#7c3aed;border:1px solid rgba(124,58,237,0.2)}
+    .role-badge.public-badge{background:rgba(37,99,235,0.1);color:#2563eb;border:1px solid rgba(37,99,235,0.2)}
+    .btn-logout{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 14px;font-size:0.72rem;font-weight:600;cursor:pointer;color:var(--text-muted);font-family:'Inter',sans-serif;transition:all 0.2s}
+    .btn-logout:hover{border-color:#dc2626;color:#dc2626}
     @media (max-width: 600px) {
       .hero-title { font-size: 1.6rem; }
       .feature-grid { grid-template-columns: 1fr; }
@@ -149,6 +167,13 @@
   </style>
 </head>
 <body>
+  <!-- User Bar -->
+  <div class="user-bar" id="user-bar" style="display:none">
+    <div class="user-info"><div class="user-avatar" id="user-avatar">A</div><span id="user-name">Admin</span></div>
+    <span class="role-badge" id="role-badge">ADMIN</span>
+    <button class="btn-logout" onclick="logout()">🚪 Logout</button>
+  </div>
+
   <!-- Hero Section -->
   <div class="dashboard-hero">
     <div class="hero-logo">
@@ -167,12 +192,22 @@
     </div>
   </div>
 
+  <!-- Live Stats Ticker -->
+  <div class="live-ticker" id="live-ticker" style="display:none">
+    <div class="tick-card"><div class="tick-val" style="color:#dc2626" id="tk-sos">0</div><div class="tick-label">🆘 Active SOS</div></div>
+    <div class="tick-card"><div class="tick-val" style="color:#ca8a04" id="tk-pending">0</div><div class="tick-label">📨 Pending Requests</div></div>
+    <div class="tick-card"><div class="tick-val" style="color:#2563eb" id="tk-convoys">0</div><div class="tick-label">🚛 Active Convoys</div></div>
+    <div class="tick-card"><div class="tick-val" style="color:#16a34a" id="tk-vols">0</div><div class="tick-label">👷 Deployed Vols</div></div>
+    <div class="tick-card"><div class="tick-val" style="color:#ea580c" id="tk-zones">0</div><div class="tick-label">⚠️ Critical Zones</div></div>
+    <div class="tick-card"><div class="tick-val" style="color:#7c3aed" id="tk-pop">0</div><div class="tick-label">👥 Affected People</div></div>
+  </div>
+
   <!-- Core Features -->
   <div class="features-section">
     <div class="section-label">🎯 Core Operations</div>
     <div class="feature-grid">
 
-      <a class="feature-card" href="command-center.html" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
+      <a class="feature-card" href="command-center.html" data-role="admin" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🗺️</div>
         <div class="card-title">Command Center</div>
@@ -180,7 +215,7 @@
         <span class="card-tag tag-core">Core Dashboard</span>
       </a>
 
-      <a class="feature-card" href="ai-chat.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+      <a class="feature-card" href="ai-chat.html" data-role="both" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🤖</div>
         <div class="card-title">AI Command Chat</div>
@@ -188,7 +223,7 @@
         <span class="card-tag tag-ai">AI Powered</span>
       </a>
 
-      <a class="feature-card" href="sos.html" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
+      <a class="feature-card" href="sos.html" data-role="public" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🆘</div>
         <div class="card-title">SOS Beacon</div>
@@ -196,12 +231,36 @@
         <span class="card-tag tag-live">Live System</span>
       </a>
 
-      <a class="feature-card" href="convoys.html" style="--card-accent:#ea580c; --icon-bg:rgba(234,88,12,0.08)">
+      <a class="feature-card" href="admin-sos.html" data-role="admin" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🚨</div>
+        <div class="card-title">SOS Response Center</div>
+        <div class="card-desc">Monitor, acknowledge, dispatch rescue, and resolve all incoming SOS beacons from citizens on a live map.</div>
+        <span class="card-tag tag-core">Admin Response</span>
+      </a>
+
+      <a class="feature-card" href="convoys.html" data-role="admin" style="--card-accent:#ea580c; --icon-bg:rgba(234,88,12,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🚛</div>
         <div class="card-title">Convoy Tracker</div>
         <div class="card-desc">Track resource convoys moving from hub to disaster zones with animated routes, ETA, and cargo details.</div>
         <span class="card-tag tag-live">Real-Time</span>
+      </a>
+
+      <a class="feature-card" href="help-request.html" data-role="public" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">🚨</div>
+        <div class="card-title">Request Help</div>
+        <div class="card-desc">Submit emergency requests for food, water, medical aid, or rescue. Includes helpline numbers and request tracking.</div>
+        <span class="card-tag tag-live">Public</span>
+      </a>
+
+      <a class="feature-card" href="admin-requests.html" data-role="admin" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+        <span class="card-arrow">→</span>
+        <div class="card-icon">📋</div>
+        <div class="card-title">Public Requests Panel</div>
+        <div class="card-desc">View, accept, reject, and dispatch incoming help requests from citizens with live notifications and filters.</div>
+        <span class="card-tag tag-ai">Admin Panel</span>
       </a>
 
     </div>
@@ -212,7 +271,7 @@
     <div class="section-label">📡 Intelligence & Analysis</div>
     <div class="feature-grid">
 
-      <a class="feature-card" href="analytics.html" style="--card-accent:#2563eb; --icon-bg:rgba(37,99,235,0.08)">
+      <a class="feature-card" href="analytics.html" data-role="admin" style="--card-accent:#2563eb; --icon-bg:rgba(37,99,235,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">📊</div>
         <div class="card-title">Analytics Dashboard</div>
@@ -220,7 +279,7 @@
         <span class="card-tag tag-data">Data Insights</span>
       </a>
 
-      <a class="feature-card" href="scenarios.html" style="--card-accent:#0891b2; --icon-bg:rgba(8,145,178,0.08)">
+      <a class="feature-card" href="scenarios.html" data-role="admin" style="--card-accent:#0891b2; --icon-bg:rgba(8,145,178,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🌊</div>
         <div class="card-title">Disaster Scenarios</div>
@@ -228,7 +287,7 @@
         <span class="card-tag tag-ai">Simulation Engine</span>
       </a>
 
-      <a class="feature-card" href="social-monitor.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+      <a class="feature-card" href="social-monitor.html" data-role="admin" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">📱</div>
         <div class="card-title">Social Media Monitor</div>
@@ -236,7 +295,7 @@
         <span class="card-tag tag-ai">NLP Analysis</span>
       </a>
 
-      <a class="feature-card" href="satellite.html" style="--card-accent:#0891b2; --icon-bg:rgba(8,145,178,0.08)">
+      <a class="feature-card" href="satellite.html" data-role="admin" style="--card-accent:#0891b2; --icon-bg:rgba(8,145,178,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🛰️</div>
         <div class="card-title">Satellite Imagery</div>
@@ -252,7 +311,7 @@
     <div class="section-label">🛡️ Field Operations & Response</div>
     <div class="feature-grid">
 
-      <a class="feature-card" href="alerts.html" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
+      <a class="feature-card" href="alerts.html" data-role="admin" style="--card-accent:#dc2626; --icon-bg:rgba(220,38,38,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🔔</div>
         <div class="card-title">Alert System</div>
@@ -260,7 +319,7 @@
         <span class="card-tag tag-live">Broadcasting</span>
       </a>
 
-      <a class="feature-card" href="volunteers.html" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
+      <a class="feature-card" href="volunteers.html" data-role="both" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🤝</div>
         <div class="card-title">Volunteer & NGO Hub</div>
@@ -268,7 +327,7 @@
         <span class="card-tag tag-ai">AI Matching</span>
       </a>
 
-      <a class="feature-card" href="infrastructure.html" style="--card-accent:#ea580c; --icon-bg:rgba(234,88,12,0.08)">
+      <a class="feature-card" href="infrastructure.html" data-role="admin" style="--card-accent:#ea580c; --icon-bg:rgba(234,88,12,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🏗️</div>
         <div class="card-title">Infrastructure Assessment</div>
@@ -276,7 +335,7 @@
         <span class="card-tag tag-data">Assessment</span>
       </a>
 
-      <a class="feature-card" href="health-tracker.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+      <a class="feature-card" href="health-tracker.html" data-role="admin" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🧬</div>
         <div class="card-title">Epidemic & Health Tracker</div>
@@ -284,7 +343,7 @@
         <span class="card-tag tag-ai">Health Intel</span>
       </a>
 
-      <a class="feature-card" href="reports.html" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
+      <a class="feature-card" href="reports.html" data-role="admin" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">📄</div>
         <div class="card-title">Report Generator</div>
@@ -300,7 +359,7 @@
     <div class="section-label">🧠 Advanced Intelligence & Automation</div>
     <div class="feature-grid">
 
-      <a class="feature-card" href="forecasting.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+      <a class="feature-card" href="forecasting.html" data-role="admin" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🧠</div>
         <div class="card-title">AI Predictive Forecasting</div>
@@ -308,7 +367,7 @@
         <span class="card-tag tag-ai">Predictive AI</span>
       </a>
 
-      <a class="feature-card" href="drone-dispatch.html" style="--card-accent:#0891b2; --icon-bg:rgba(8,145,178,0.08)">
+      <a class="feature-card" href="drone-dispatch.html" data-role="admin" style="--card-accent:#0891b2; --icon-bg:rgba(8,145,178,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🚁</div>
         <div class="card-title">Drone Pathfinding</div>
@@ -316,7 +375,7 @@
         <span class="card-tag tag-live">Aerial Ops</span>
       </a>
 
-      <a class="feature-card" href="audit-ledger.html" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
+      <a class="feature-card" href="audit-ledger.html" data-role="admin" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🔗</div>
         <div class="card-title">Resource Audit Ledger</div>
@@ -324,7 +383,7 @@
         <span class="card-tag tag-core">Blockchain</span>
       </a>
 
-      <a class="feature-card" href="voice-command.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+      <a class="feature-card" href="voice-command.html" data-role="admin" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🎙️</div>
         <div class="card-title">Voice Command Center</div>
@@ -332,7 +391,7 @@
         <span class="card-tag tag-ai">Speech API</span>
       </a>
 
-      <a class="feature-card" href="agriculture.html" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
+      <a class="feature-card" href="agriculture.html" data-role="both" style="--card-accent:#16a34a; --icon-bg:rgba(22,163,74,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🌱</div>
         <div class="card-title">Agricultural Assessment</div>
@@ -348,7 +407,7 @@
     <div class="section-label">🔬 Resilience, Simulation & Optimization</div>
     <div class="feature-grid">
 
-      <a class="feature-card" href="risk-heatmap.html" style="--card-accent:#ea580c; --icon-bg:rgba(234,88,12,0.08)">
+      <a class="feature-card" href="risk-heatmap.html" data-role="admin" style="--card-accent:#ea580c; --icon-bg:rgba(234,88,12,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">📊</div>
         <div class="card-title">Dynamic Risk Heatmap</div>
@@ -356,7 +415,7 @@
         <span class="card-tag tag-live">Leaflet.heat</span>
       </a>
 
-      <a class="feature-card" href="offline-mesh.html" style="--card-accent:#f59e0b; --icon-bg:rgba(245,158,11,0.08)">
+      <a class="feature-card" href="offline-mesh.html" data-role="both" style="--card-accent:#f59e0b; --icon-bg:rgba(245,158,11,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">📡</div>
         <div class="card-title">Offline Mesh Network</div>
@@ -364,7 +423,7 @@
         <span class="card-tag tag-ai">Mesh Sim</span>
       </a>
 
-      <a class="feature-card" href="supply-chain.html" style="--card-accent:#2563eb; --icon-bg:rgba(37,99,235,0.08)">
+      <a class="feature-card" href="supply-chain.html" data-role="admin" style="--card-accent:#2563eb; --icon-bg:rgba(37,99,235,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">📦</div>
         <div class="card-title">Supply Chain Optimizer</div>
@@ -372,7 +431,7 @@
         <span class="card-tag tag-ai">Route AI</span>
       </a>
 
-      <a class="feature-card" href="damage-detection.html" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
+      <a class="feature-card" href="damage-detection.html" data-role="both" style="--card-accent:#7c3aed; --icon-bg:rgba(124,58,237,0.08)">
         <span class="card-arrow">→</span>
         <div class="card-icon">🛰️</div>
         <div class="card-title">AI Damage Detection</div>
@@ -437,6 +496,70 @@
     }
     loadTicker();
     setInterval(loadTicker, 30000);
+
+    // Auth guard & role-based filtering
+    function logout(){sessionStorage.clear();window.location.href='/login.html';}
+
+    (function(){
+      const role=sessionStorage.getItem('crisisiq_role');
+      const user=sessionStorage.getItem('crisisiq_user');
+      if(!role){window.location.href='/login.html';return;}
+
+      // Show user bar
+      const bar=document.getElementById('user-bar');
+      bar.style.display='flex';
+      document.getElementById('user-name').textContent=user||'User';
+      const avatar=document.getElementById('user-avatar');
+      const badge=document.getElementById('role-badge');
+
+      if(role==='admin'){
+        avatar.textContent=user?user.charAt(0).toUpperCase():'A';
+        avatar.className='user-avatar admin-avatar';
+        badge.textContent='🛡️ ADMIN';
+        badge.className='role-badge admin-badge';
+      }else{
+        avatar.textContent=user?user.charAt(0).toUpperCase():'U';
+        avatar.className='user-avatar public-avatar';
+        badge.textContent='👥 PUBLIC';
+        badge.className='role-badge public-badge';
+      }
+
+      // Filter cards by role
+      document.querySelectorAll('.feature-card[data-role]').forEach(card=>{
+        const cardRole=card.getAttribute('data-role');
+        if(role==='admin'){
+          // Admin sees admin + both, hide public-only
+          if(cardRole==='public')card.classList.add('role-hidden');
+        }else{
+          // Public sees public + both, hide admin-only
+          if(cardRole==='admin')card.classList.add('role-hidden');
+        }
+      });
+
+      // Hide empty sections
+      document.querySelectorAll('.features-section').forEach(section=>{
+        const visible=section.querySelectorAll('.feature-card:not(.role-hidden)');
+        if(visible.length===0)section.style.display='none';
+      });
+
+      // Live Stats Ticker
+      document.getElementById('live-ticker').style.display='grid';
+      async function refreshTicker(){
+        try{
+          const s=await(await fetch('/api/stats')).json();
+          document.getElementById('tk-sos').textContent=s.activeBeacons;
+          document.getElementById('tk-pending').textContent=s.pendingRequests;
+          document.getElementById('tk-convoys').textContent=s.activeConvoys;
+          document.getElementById('tk-vols').textContent=s.deployedVolunteers;
+          document.getElementById('tk-zones').textContent=s.criticalZones;
+          document.getElementById('tk-pop').textContent=(s.population/1000).toFixed(0)+'K';
+          document.getElementById('active-zones').textContent=s.zones;
+        }catch(e){}
+      }
+      refreshTicker();
+      setInterval(refreshTicker,5000);
+    })();
   </script>
+
 </body>
 </html>

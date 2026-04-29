@@ -1,0 +1,42 @@
+[
+  {
+    "id": "CV-001",
+    "sourceType": "sos",
+    "sourceId": "SOS-001",
+    "destination": "Rajesh Kumar (SOS-001)",
+    "location": "13.09,80.28",
+    "type": "ambulance",
+    "cargo": [
+      "🚑 Emergency Response",
+      "🏥 Medical Kit",
+      "👷 Rescue Team",
+      "💧 Water Supply"
+    ],
+    "status": "delivered",
+    "progress": 1,
+    "people": 5,
+    "dispatchedAt": "2026-04-29T02:46:05.726Z",
+    "eta": "Arrived",
+    "updatedAt": "2026-04-29T03:11:00.000Z"
+  },
+  {
+    "id": "CV-002",
+    "sourceType": "sos",
+    "sourceId": "SOS-005",
+    "destination": "Nishu (SOS-005)",
+    "location": "12.823916,77.514654",
+    "type": "ambulance",
+    "cargo": [
+      "🚑 Emergency Response",
+      "🏥 Medical Kit",
+      "👷 Rescue Team",
+      "💧 Water Supply"
+    ],
+    "status": "delivered",
+    "progress": 1,
+    "people": 1,
+    "dispatchedAt": "2026-04-29T02:50:06.331Z",
+    "eta": "Arrived",
+    "updatedAt": "2026-04-29T03:11:00.000Z"
+  }
+]

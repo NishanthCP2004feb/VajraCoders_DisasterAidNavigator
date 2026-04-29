@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SOS Response Center — CrisisIQ Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/shared.css"/>
+  <style>
+    .sos-layout{display:grid;grid-template-columns:1fr 420px;gap:14px;padding:14px 20px;min-height:calc(100vh - 54px)}
+    .sos-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;grid-column:1/-1}
+    .s-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow);transition:all 0.2s}
+    .s-stat:hover{transform:translateY(-2px)}
+    .s-stat-val{font-size:1.4rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+    .s-stat-key{font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px;font-weight:600}
+    .map-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    #sos-map{width:100%;height:400px}
+    .beacon-list-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .filter-bar{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .filter-chip{padding:5px 12px;border:1px solid var(--border);border-radius:20px;font-size:0.7rem;font-weight:600;cursor:pointer;transition:all 0.2s;background:var(--bg-primary)}
+    .filter-chip:hover{border-color:var(--accent)}
+    .filter-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .beacon-list{max-height:calc(100vh - 300px);overflow-y:auto}
+    .beacon-item{padding:14px;border-bottom:1px solid var(--border);transition:all 0.2s;animation:slide-in 0.3s ease;cursor:pointer}
+    .beacon-item:hover{background:var(--bg-primary)}
+    .beacon-item.highlighted{background:rgba(220,38,38,0.03);border-left:3px solid #dc2626}
+    @keyframes slide-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+    .b-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .b-id{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.82rem;color:#dc2626}
+    .b-time{font-size:0.65rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+    .b-info{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
+    .b-field{font-size:0.72rem}
+    .b-label{color:var(--text-muted);font-size:0.6rem;text-transform:uppercase;font-weight:600}
+    .b-val{font-weight:600;margin-top:1px}
+    .b-tags{display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap}
+    .b-tag{padding:2px 8px;border-radius:5px;font-size:0.62rem;font-weight:700;text-transform:uppercase}
+    .tag-critical{background:rgba(220,38,38,0.1);color:#dc2626}
+    .tag-high{background:rgba(234,88,12,0.1);color:#ea580c}
+    .tag-medium{background:rgba(202,138,4,0.1);color:#ca8a04}
+    .tag-low{background:rgba(22,163,74,0.1);color:#16a34a}
+    .tag-active{background:rgba(220,38,38,0.1);color:#dc2626;animation:pulse-tag 1.5s infinite}
+    .tag-acknowledged{background:rgba(37,99,235,0.1);color:#2563eb}
+    .tag-dispatched{background:rgba(124,58,237,0.1);color:#7c3aed}
+    .tag-resolved{background:rgba(22,163,74,0.1);color:#16a34a}
+    @keyframes pulse-tag{0%,100%{opacity:1}50%{opacity:0.6}}
+    .b-message{background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:8px;font-size:0.72rem;color:var(--text-secondary);font-style:italic;margin-bottom:8px;line-height:1.4}
+    .b-actions{display:flex;gap:6px;flex-wrap:wrap}
+    .btn-ack{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.2s}
+    .btn-ack:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(37,99,235,0.3)}
+    .btn-disp{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.2s}
+    .btn-disp:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(124,58,237,0.3)}
+    .btn-resolve{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.2s}
+    .btn-resolve:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(22,163,74,0.3)}
+    .resp-input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.72rem;background:var(--bg-primary);color:var(--text-primary);font-family:'Inter',sans-serif;outline:none;margin-bottom:6px}
+    .resp-input:focus{border-color:var(--accent)}
+    .sidebar{display:flex;flex-direction:column;gap:10px}
+    .side-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+    .notif-list{max-height:200px;overflow-y:auto}
+    .n-item{display:flex;align-items:flex-start;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:0.7rem}
+    .n-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px}
+    .n-time{font-family:'JetBrains Mono',monospace;color:var(--text-muted);font-size:0.62rem;flex-shrink:0}
+    .n-text{flex:1;line-height:1.4}
+    .timeline-item{padding:8px 12px;border-left:2px solid var(--border);margin-left:12px;font-size:0.72rem;position:relative}
+    .timeline-item::before{content:'';width:8px;height:8px;border-radius:50%;position:absolute;left:-5px;top:10px}
+    .timeline-item.t-active::before{background:#dc2626}
+    .timeline-item.t-ack::before{background:#2563eb}
+    .timeline-item.t-disp::before{background:#7c3aed}
+    .timeline-item.t-resolved::before{background:#16a34a}
+    .b-admin-resp{font-size:0.68rem;color:var(--accent);margin-top:4px;padding:4px 8px;background:rgba(37,99,235,0.05);border-radius:4px}
+    .empty-state{padding:30px;text-align:center;color:var(--text-muted);font-size:0.82rem}
+    .pulse-nav{position:relative}
+    .pulse-nav::after{content:'';position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:#dc2626;border-radius:50%;animation:pulse-dot 1.5s infinite}
+    @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.3)}}
+    @media(max-width:900px){.sos-layout{grid-template-columns:1fr}.sos-stats{grid-template-columns:repeat(3,1fr)}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="nav-back">← Dashboard</a>
+      <div class="nav-title-group">
+        <div class="nav-icon" style="background:rgba(220,38,38,0.08)">🆘</div>
+        <div><div class="nav-page-title">SOS Response Center</div><div class="nav-page-sub">Monitor · Acknowledge · Dispatch · Resolve</div></div>
+      </div>
+    </div>
+    <div class="nav-right"><div class="nav-live pulse-nav"><span class="dot" style="background:#dc2626"></span> <span id="active-count">0</span> ACTIVE</div><div class="nav-clock" id="clock">--:--</div></div>
+  </nav>
+
+  <div class="sos-layout">
+    <!-- Stats -->
+    <div class="sos-stats">
+      <div class="s-stat"><div class="s-stat-val" style="color:#dc2626" id="st-total">0</div><div class="s-stat-key">Total SOS</div></div>
+      <div class="s-stat"><div class="s-stat-val" style="color:#ea580c" id="st-active">0</div><div class="s-stat-key">🔴 Active</div></div>
+      <div class="s-stat"><div class="s-stat-val" style="color:#2563eb" id="st-ack">0</div><div class="s-stat-key">Acknowledged</div></div>
+      <div class="s-stat"><div class="s-stat-val" style="color:#7c3aed" id="st-disp">0</div><div class="s-stat-key">Dispatched</div></div>
+      <div class="s-stat"><div class="s-stat-val" style="color:#16a34a" id="st-resolved">0</div><div class="s-stat-key">Resolved</div></div>
+    </div>
+
+    <!-- Map + Beacon List -->
+    <div>
+      <div class="map-card">
+        <div class="card-header">📍 Live SOS Beacon Map</div>
+        <div id="sos-map"></div>
+      </div>
+
+      <div class="beacon-list-card" style="margin-top:10px">
+        <div class="card-header">🆘 All SOS Beacons</div>
+        <div class="filter-bar">
+          <span class="filter-chip active" onclick="setFilter('all',this)">All</span>
+          <span class="filter-chip" onclick="setFilter('active',this)">🔴 Active</span>
+          <span class="filter-chip" onclick="setFilter('acknowledged',this)">🔵 Acknowledged</span>
+          <span class="filter-chip" onclick="setFilter('dispatched',this)">🟣 Dispatched</span>
+          <span class="filter-chip" onclick="setFilter('resolved',this)">🟢 Resolved</span>
+        </div>
+        <div class="beacon-list" id="beacon-list">
+          <div class="empty-state">📡 Monitoring for SOS beacons...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="side-card">
+        <div class="card-header">🔔 Live SOS Alerts</div>
+        <div class="notif-list" id="notif-list">
+          <div style="padding:14px;text-align:center;color:var(--text-muted);font-size:0.72rem">Listening for SOS signals...</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="card-header">📊 Urgency Breakdown</div>
+        <div id="urgency-chart" style="padding:12px">
+          <div style="text-align:center;color:var(--text-muted);font-size:0.72rem">No data</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="card-header">📋 Recent Activity Timeline</div>
+        <div id="timeline" style="padding:10px;max-height:220px;overflow-y:auto">
+          <div style="text-align:center;color:var(--text-muted);font-size:0.72rem;padding:10px">No activity yet</div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="card-header">⚡ Bulk Actions</div>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:6px">
+          <button class="btn-ack" style="width:100%" onclick="bulkSOS('acknowledged')">🔵 Acknowledge All Active</button>
+          <button class="btn-disp" style="width:100%" onclick="bulkSOS('dispatched')">🟣 Dispatch All Acknowledged</button>
+          <button class="btn-resolve" style="width:100%" onclick="bulkSOS('resolved')">🟢 Resolve All Dispatched</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})},1000);
+
+    // Map setup
+    const map=L.map('sos-map').setView([13.08,80.27],11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+    let markers=[];
+
+    let beacons=[];let currentFilter='all';let notifications=[];let timeline=[];let knownIds=new Set();
+
+    const urgColors={critical:'#dc2626',high:'#ea580c',medium:'#ca8a04',low:'#16a34a'};
+    const statusIcons={active:'🔴',acknowledged:'🔵',dispatched:'🟣',resolved:'🟢'};
+
+    async function loadSOS(){
+      try{
+        const d=await(await fetch('/api/sos')).json();
+        // Detect new beacons
+        d.beacons.forEach(b=>{
+          if(!knownIds.has(b.id)){
+            knownIds.add(b.id);
+            if(beacons.length>0){
+              addNotif('🆘 NEW SOS from '+(b.name||'Unknown')+' — '+(b.urgency||'high')+' urgency',urgColors[b.urgency]||'#dc2626');
+              addTimeline('active','SOS '+b.id+' received from '+(b.name||'Unknown'));
+              if(b.urgency==='critical')playAlert();
+            }
+          }
+        });
+        beacons=d.beacons;
+        document.getElementById('active-count').textContent=d.active;
+        renderBeacons();updateStats();updateMap();
+      }catch(e){}
+    }
+
+    function playAlert(){
+      try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;o.type='square';g.gain.setValueAtTime(0.12,c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+0.8);o.start();o.stop(c.currentTime+0.8);}catch(e){}
+    }
+
+    function setFilter(f,el){
+      currentFilter=f;
+      document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active');renderBeacons();
+    }
+
+    function updateMap(){
+      markers.forEach(m=>map.removeLayer(m));markers=[];
+      beacons.forEach(b=>{
+        if(!b.latitude||!b.longitude)return;
+        const color=b.status==='active'?'red':b.status==='acknowledged'?'blue':b.status==='dispatched'?'purple':'green';
+        const icon=L.divIcon({className:'',html:`<div style="width:14px;height:14px;border-radius:50%;background:${urgColors[b.urgency]||'#dc2626'};border:2px solid #fff;box-shadow:0 0 8px ${urgColors[b.urgency]||'#dc2626'}80;${b.status==='active'?'animation:pulse-dot 1.5s infinite':''}"></div>`,iconSize:[14,14],iconAnchor:[7,7]});
+        const m=L.marker([b.latitude,b.longitude],{icon}).addTo(map);
+        m.bindPopup(`<b>${b.id}</b> — ${b.name||'Unknown'}<br/>Status: ${b.status}<br/>Urgency: ${b.urgency||'high'}<br/>People: ${b.people||1}`);
+        markers.push(m);
+      });
+      if(markers.length>0){
+        const group=L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.2));
+      }
+    }
+
+    function renderBeacons(){
+      const filtered=currentFilter==='all'?beacons:beacons.filter(b=>b.status===currentFilter);
+      const el=document.getElementById('beacon-list');
+      if(filtered.length===0){el.innerHTML='<div class="empty-state">📡 No '+currentFilter+' SOS beacons</div>';return;}
+
+      el.innerHTML=filtered.sort((a,b)=>{
+        const sOrd={active:0,acknowledged:1,dispatched:2,resolved:3};
+        const uOrd={critical:0,high:1,medium:2,low:3};
+        if(sOrd[a.status]!==sOrd[b.status])return(sOrd[a.status]||0)-(sOrd[b.status]||0);
+        return(uOrd[a.urgency]||1)-(uOrd[b.urgency]||1);
+      }).map(b=>{
+        const time=new Date(b.timestamp).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
+        const isActive=b.status==='active';const isAck=b.status==='acknowledged';const isDisp=b.status==='dispatched';
+        return`<div class="beacon-item ${isActive?'highlighted':''}" onclick="focusBeacon(${b.latitude},${b.longitude})">
+<div class="b-header"><span class="b-id">🆘 ${b.id}</span><span class="b-time">${time}</span></div>
+<div class="b-tags"><span class="b-tag tag-${b.status}">${statusIcons[b.status]||''} ${b.status.toUpperCase()}</span><span class="b-tag tag-${b.urgency||'high'}">${(b.urgency||'high').toUpperCase()}</span>${b.emergencyType?`<span class="b-tag" style="background:rgba(124,58,237,0.08);color:#7c3aed">${b.emergencyType}</span>`:''}</div>
+<div class="b-info"><div class="b-field"><div class="b-label">Name</div><div class="b-val">${b.name||'Unknown'}</div></div><div class="b-field"><div class="b-label">Phone</div><div class="b-val">${b.phone?`<a href="tel:${b.phone}" style="color:var(--accent)">${b.phone}</a>`:'—'}</div></div><div class="b-field"><div class="b-label">People</div><div class="b-val">${b.people||1} affected</div></div><div class="b-field"><div class="b-label">Location</div><div class="b-val">${b.latitude?b.latitude.toFixed(4)+', '+b.longitude.toFixed(4):'Unknown'}</div></div></div>
+${b.details?`<div class="b-message">"${b.details}"</div>`:''}
+${b.adminResponse?`<div class="b-admin-resp">📝 Admin: ${b.adminResponse}</div>`:''}
+${isActive?`<input class="resp-input" id="resp-${b.id}" placeholder="Response message to citizen..."/>
+<div class="b-actions"><button class="btn-ack" onclick="event.stopPropagation();respondSOS('${b.id}','acknowledged')">🔵 Acknowledge</button><button class="btn-disp" onclick="event.stopPropagation();respondSOS('${b.id}','dispatched')">🟣 Dispatch Help</button></div>`:''}
+${isAck?`<div class="b-actions"><button class="btn-disp" onclick="event.stopPropagation();respondSOS('${b.id}','dispatched')">🟣 Dispatch Rescue</button></div>`:''}
+${isDisp?`<div class="b-actions"><button class="btn-resolve" onclick="event.stopPropagation();respondSOS('${b.id}','resolved')">🟢 Mark Resolved</button></div>`:''}
+</div>`;
+      }).join('');
+    }
+
+    function focusBeacon(lat,lng){
+      if(lat&&lng)map.flyTo([lat,lng],14,{duration:0.8});
+    }
+
+    async function respondSOS(id,status){
+      const inp=document.getElementById('resp-'+id);
+      try{
+        await fetch('/api/sos/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,adminResponse:inp?inp.value:''})});
+        const label={acknowledged:'🔵 Acknowledged',dispatched:'🟣 Dispatched',resolved:'🟢 Resolved'}[status];
+        addNotif('SOS '+id+' → '+label,status==='acknowledged'?'#2563eb':status==='dispatched'?'#7c3aed':'#16a34a');
+        addTimeline(status==='acknowledged'?'ack':status==='dispatched'?'disp':'resolved','SOS '+id+' '+status);
+        loadSOS();
+      }catch(e){}
+    }
+
+    async function bulkSOS(status){
+      const fromStatus={acknowledged:'active',dispatched:'acknowledged',resolved:'dispatched'}[status];
+      const targets=beacons.filter(b=>b.status===fromStatus);
+      if(!targets.length)return;
+      for(const b of targets){await fetch('/api/sos/'+b.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,adminResponse:'Bulk action'})});}
+      addNotif('⚡ Bulk: '+targets.length+' SOS → '+status,'#7c3aed');
+      loadSOS();
+    }
+
+    function addNotif(text,color){
+      notifications.unshift({text,color,time:new Date()});
+      document.getElementById('notif-list').innerHTML=notifications.slice(0,25).map(n=>`<div class="n-item"><span class="n-dot" style="background:${n.color}"></span><span class="n-time">${n.time.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span><span class="n-text">${n.text}</span></div>`).join('');
+    }
+
+    function addTimeline(type,text){
+      timeline.unshift({type,text,time:new Date()});
+      document.getElementById('timeline').innerHTML=timeline.slice(0,15).map(t=>`<div class="timeline-item t-${t.type}"><span style="font-size:0.65rem;color:var(--text-muted)">${t.time.toLocaleTimeString('en-US',{hour12:false})}</span><br/>${t.text}</div>`).join('');
+    }
+
+    function updateStats(){
+      document.getElementById('st-total').textContent=beacons.length;
+      document.getElementById('st-active').textContent=beacons.filter(b=>b.status==='active').length;
+      document.getElementById('st-ack').textContent=beacons.filter(b=>b.status==='acknowledged').length;
+      document.getElementById('st-disp').textContent=beacons.filter(b=>b.status==='dispatched').length;
+      document.getElementById('st-resolved').textContent=beacons.filter(b=>b.status==='resolved').length;
+
+      // Urgency chart
+      const urg={critical:0,high:0,medium:0,low:0};
+      beacons.forEach(b=>{urg[b.urgency||'high']=(urg[b.urgency||'high']||0)+1;});
+      const total=beacons.length||1;
+      document.getElementById('urgency-chart').innerHTML=Object.entries(urg).map(([k,v])=>{
+        const pct=Math.round(v/total*100);
+        return`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:0.75rem;width:16px">${{critical:'🔴',high:'🟠',medium:'🟡',low:'🟢'}[k]}</span><span style="flex:1;font-size:0.72rem;font-weight:600">${k.charAt(0).toUpperCase()+k.slice(1)}</span><div style="width:70px;height:5px;background:var(--bg-primary);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${urgColors[k]};border-radius:3px"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;font-weight:700;color:${urgColors[k]}">${v}</span></div>`;
+      }).join('');
+    }
+
+    // Initial load + polling
+    loadSOS();setInterval(loadSOS,3000);
+  </script>
+</body>
+</html>
