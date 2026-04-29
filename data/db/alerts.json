@@ -1,5 +1,16 @@
 [
   {
+    "tier": "emergency",
+    "title": "Alert",
+    "message": "khsbdcj",
+    "zones": [
+      "ALL"
+    ],
+    "id": "ALT-002",
+    "createdAt": "2026-04-29T04:12:47.679Z",
+    "acknowledged": false
+  },
+  {
     "tier": "warning",
     "title": "EarthQuake",
     "message": "Escape",

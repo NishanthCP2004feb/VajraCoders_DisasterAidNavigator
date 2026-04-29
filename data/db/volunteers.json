@@ -128,5 +128,24 @@
     "hoursServed": 0,
     "assignedZone": "Market Square",
     "updatedAt": "2026-04-29T03:51:30.176Z"
+  },
+  {
+    "name": "Nisha",
+    "organization": "",
+    "phone": "+918618270148",
+    "availability": "Full-time",
+    "skills": [
+      "medical",
+      "driving"
+    ],
+    "experience": "Beginner",
+    "avatar": "👨‍🚒",
+    "avatarBg": "#fce7f3",
+    "id": "VOL-008",
+    "registeredAt": "2026-04-29T04:50:19.502Z",
+    "status": "available",
+    "missionsCompleted": 0,
+    "hoursServed": 0,
+    "assignedZone": ""
   }
 ]

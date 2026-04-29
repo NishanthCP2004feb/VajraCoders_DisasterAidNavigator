@@ -30,6 +30,8 @@
     try {
       const res = await fetch(API + '/api/zones');
       const data = await res.json();
+      baseZones = data.zones; // save original zones for disaster switching
+      currentHub = data.reliefHub;
       CrisisMap.renderZones(
         data.zones.map(z => ({ zone: z, priority: getPriority(z.severity) })),
         data.reliefHub,
@@ -51,12 +53,150 @@
     return 'LOW';
   }
 
+  // ── DISASTER TYPE PRESETS ────────────────────────────────────────────────
+  const DISASTER_PRESETS = {
+    flood: {
+      label: '🌊 Flood & Storm',
+      icon: '🌩️',
+      weatherLabel: 'Severe Storm',
+      scenarioLabel: '🌊 Scenario: Severe Flood & Storm',
+      severityModifiers: { Z001: 9, Z002: 8, Z003: 5, Z004: 7, Z005: 6, Z006: 4, Z007: 3, Z008: 8 },
+      noteOverrides: {
+        Z001: 'Severe flooding, multiple buildings collapsed, rescue ops ongoing',
+        Z002: 'Landslides blocking main road, hospital overwhelmed',
+        Z005: 'River overflowing, low-lying areas submerged',
+        Z008: 'Flash flood alert, fishing boats stranded'
+      }
+    },
+    earthquake: {
+      label: '🏚️ Earthquake',
+      icon: '🏚️',
+      weatherLabel: 'Post-Quake',
+      scenarioLabel: '🏚️ Scenario: Major Earthquake (6.8M)',
+      severityModifiers: { Z001: 10, Z002: 9, Z003: 8, Z004: 6, Z005: 4, Z006: 7, Z007: 5, Z008: 9 },
+      noteOverrides: {
+        Z001: 'Multiple structures collapsed, trapped survivors reported, urgent rescue needed',
+        Z002: 'Hillside buildings destroyed, aftershock damage ongoing',
+        Z003: 'Market buildings cracked, gas leak detected',
+        Z006: 'Old infrastructure collapsed, water mains broken',
+        Z008: 'Coastal structures damaged, ground liquefaction observed'
+      }
+    },
+    cyclone: {
+      label: '🌀 Cyclone',
+      icon: '🌀',
+      weatherLabel: 'Cyclone Cat-3',
+      scenarioLabel: '🌀 Scenario: Cyclone Vardah (Category 3)',
+      severityModifiers: { Z001: 9, Z002: 7, Z003: 6, Z004: 8, Z005: 9, Z006: 5, Z007: 4, Z008: 10 },
+      noteOverrides: {
+        Z001: 'Severe wind damage, roofs torn off, power lines down',
+        Z004: 'Cyclone surge flooding industrial zone, toxic spill risk',
+        Z005: 'Eye of cyclone passed nearby, extreme damage radius',
+        Z008: 'Coastal port destroyed, storm surge 3m+, mass evacuation needed'
+      }
+    },
+    wildfire: {
+      label: '🔥 Wildfire',
+      icon: '🔥',
+      weatherLabel: 'Fire Extreme',
+      scenarioLabel: '🔥 Scenario: Urban Wildfire Spread',
+      severityModifiers: { Z001: 6, Z002: 10, Z003: 7, Z004: 9, Z005: 4, Z006: 8, Z007: 5, Z008: 3 },
+      noteOverrides: {
+        Z002: 'Hillside wildfire spreading rapidly, evacuation ordered',
+        Z004: 'Industrial fire from chemical plant, toxic smoke plume',
+        Z006: 'Dry vegetation fire approaching residential area',
+        Z003: 'Market district fire from gas leak, multiple blocks affected'
+      }
+    },
+    tsunami: {
+      label: '🌊 Tsunami',
+      icon: '🌊',
+      weatherLabel: 'Tsunami Alert',
+      scenarioLabel: '🌊 Scenario: Tsunami Warning (Coastal Impact)',
+      severityModifiers: { Z001: 10, Z002: 4, Z003: 7, Z004: 6, Z005: 9, Z006: 5, Z007: 3, Z008: 10 },
+      noteOverrides: {
+        Z001: 'Tsunami wave 2.5m hit coastline, massive inundation',
+        Z005: 'Riverside completely submerged by tsunami backwash',
+        Z008: 'Port obliterated, ships washed ashore, search & rescue active',
+        Z003: 'Inland flooding from tsunami surge reaching 1.5km'
+      }
+    },
+    epidemic: {
+      label: '🦠 Epidemic',
+      icon: '🦠',
+      weatherLabel: 'Outbreak Lv4',
+      scenarioLabel: '🦠 Scenario: Disease Outbreak (Level 4)',
+      severityModifiers: { Z001: 8, Z002: 6, Z003: 9, Z004: 7, Z005: 5, Z006: 8, Z007: 10, Z008: 4 },
+      noteOverrides: {
+        Z003: 'Market Square — epicenter of outbreak, quarantine zone established',
+        Z006: 'Hospital ICU overflow, 200+ cases in 48hrs',
+        Z007: 'Dense residential area, rapid community spread detected',
+        Z001: 'Medical supply shortage critical, mobile clinics deployed'
+      }
+    }
+  };
+
+  let baseZones = []; // original zone data
+  let currentDisaster = 'flood';
+
+  function applyDisasterPreset(type) {
+    currentDisaster = type;
+    const preset = DISASTER_PRESETS[type];
+    if (!preset || !baseZones.length) return;
+
+    // Clone and modify zones based on preset
+    const modifiedZones = baseZones.map(z => {
+      const clone = Object.assign({}, z);
+      if (preset.severityModifiers[z.id] !== undefined) {
+        clone.severity = preset.severityModifiers[z.id];
+      }
+      if (preset.noteOverrides[z.id]) {
+        clone.notes = preset.noteOverrides[z.id];
+      }
+      // Adjust road access for high severity
+      if (clone.severity >= 9) clone.roadAccess = 'blocked';
+      else if (clone.severity >= 7) clone.roadAccess = 'partial';
+      else clone.roadAccess = 'clear';
+      return clone;
+    });
+
+    // Re-render map
+    CrisisMap.renderZones(
+      modifiedZones.map(z => ({ zone: z, priority: getPriority(z.severity) })),
+      currentHub,
+      openZoneModal
+    );
+    CrisisMap.fitBounds(modifiedZones.map(z => ({ zone: z })));
+
+    // Update metrics
+    $('val-zones').textContent = modifiedZones.length;
+    $('val-population').textContent = modifiedZones.reduce((s, z) => s + z.population, 0).toLocaleString();
+    $('val-critical').textContent = modifiedZones.filter(z => z.severity >= 8).length;
+    $('val-weather').textContent = preset.weatherLabel;
+    $('sig-weather').textContent = preset.weatherLabel;
+
+    // Update scenario banner
+    $('scenario-text').textContent = preset.scenarioLabel + ' — Active';
+
+    addFeedItem('yellow', 'Disaster scenario switched to ' + preset.label);
+  }
+
+  let currentHub = null;
+
   // ── EVENT HANDLERS ────────────────────────────────────────────────────────
   function setupEvents() {
     $('btn-generate-plan').addEventListener('click', generatePlan);
     $('btn-demo-scenario').addEventListener('click', toggleScenario);
     $('btn-scenario-stop').addEventListener('click', stopScenario);
     $('btn-export').addEventListener('click', exportPlan);
+
+    // Disaster type selector
+    const disasterSel = $('disaster-type');
+    if (disasterSel) {
+      disasterSel.addEventListener('change', (e) => {
+        applyDisasterPreset(e.target.value);
+      });
+    }
   }
 
   // ── GENERATE PLAN ─────────────────────────────────────────────────────────
